@@ -793,6 +793,7 @@
       </nav>
       <div class="sync-card">
         <p>Datos conectados a la planilla Google Sheets entregada. La sincronización actualiza búsqueda, ficha y ranking.</p>
+        <p id="versionLabel" style="margin-top:-4px;font-size:11px;color:rgba(255,255,255,.58);"></p>
         <button class="btn ghost" id="syncButton" type="button">Sincronizar datos</button>
       </div>
     </aside>
@@ -992,7 +993,8 @@
 
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
-    const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwpH3WBmXItfCPJS6AysV01jYFI8BuPLAYSws2rL9Qb8WM-jKHbplBj_XUfGQ0zH6yX/exec";
+    const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwUyTXbpMPo3FOL8dHfq-gZSRavhVs6gnDdIFrA0WeXtKFbzQrPxgUF4wkxJ2XmSDp4/exec";
+    const APP_VERSION = "2026-06-16-sync-planilla-nueva-v2";
 
     const seedTurns = [
       { name: "Carolina Reyes M.", id: "12.345.678-9", address: "Monjitas 527, Santiago", phone: "+56 9 1111 2222", email: "carolina@example.cl", court: "1° Juzgado Civil", subject: "Civil", date: "2026-01-01", year: "2026", month: "Enero", status: "Cumplido", notes: "Dato de ejemplo" },
@@ -1053,9 +1055,11 @@
       if (typeof turnOrValue === "object") {
         const phoneDigits = String(turnOrValue.phone || "").replace(/\D/g, "");
         if (phoneDigits.length >= 7) return `fono:${phoneDigits}`;
+        const normalizedName = normalize(turnOrValue.name || "");
+        if (normalizedName) return `nombre:${normalizedName}`;
         const firstEmail = String(turnOrValue.email || "").split(/[\/,; ]+/).find(item => item.includes("@"));
         if (firstEmail) return `email:${normalize(firstEmail)}`;
-        return `nombre:${normalize(turnOrValue.name || turnOrValue.id || "")}`;
+        return `id:${normalize(turnOrValue.id || "")}`;
       }
       return String(turnOrValue || "");
     }
@@ -1697,7 +1701,7 @@
       selectedLawyerKey = "";
       renderAll();
       renderLawyerDetail(null);
-      showToast("Datos sincronizados desde Google Sheets.");
+      showToast(`Datos sincronizados: ${turns.length} turnos, ${groupLawyers().length} abogados.`);
     }
 
     function saveTurnToGoogleSheet(turn) {
@@ -1921,6 +1925,7 @@
       button.addEventListener("click", () => showView(button.dataset.view));
     });
 
+    document.querySelector("#versionLabel").textContent = `Versión ${APP_VERSION}`;
     renderAll();
     renderLawyerDetail(null);
     syncFromSheet().catch(() => showToast("No se pudo sincronizar la planilla; se muestran datos de ejemplo."));
