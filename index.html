@@ -1,0 +1,1868 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Turnos de Abogados</title>
+  <style>
+    :root {
+      --navy: #14213d;
+      --ink: #182235;
+      --muted: #667085;
+      --line: #d8dee9;
+      --panel: #ffffff;
+      --page: #f3f6f9;
+      --gold: #b88a2d;
+      --green: #0f766e;
+      --red: #b42318;
+      --blue: #255d9b;
+      --soft-blue: #e8f0fa;
+      --soft-gold: #f7efe0;
+      --shadow: 0 14px 35px rgba(20, 33, 61, .12);
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      background: linear-gradient(135deg, rgba(20,33,61,.05), rgba(184,138,45,.05)), var(--page);
+      color: var(--ink);
+    }
+
+    button, input, select, textarea { font: inherit; }
+
+    .app-shell {
+      min-height: 100vh;
+      display: grid;
+      grid-template-columns: 280px minmax(0, 1fr);
+    }
+
+    aside {
+      background: var(--navy);
+      color: #fff;
+      padding: 24px 18px;
+      position: sticky;
+      top: 0;
+      height: 100vh;
+      overflow: auto;
+    }
+
+    .brand {
+      display: grid;
+      gap: 8px;
+      padding-bottom: 22px;
+      border-bottom: 1px solid rgba(255,255,255,.16);
+    }
+
+    .brand-main {
+      display: flex;
+      gap: 12px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .brand-logo {
+      width: 62px;
+      max-width: 62px;
+      height: auto;
+      display: block;
+      flex: 0 0 auto;
+    }
+
+    .seal {
+      width: 46px;
+      height: 46px;
+      border-radius: 50%;
+      background: radial-gradient(circle at 35% 35%, #f6d386, var(--gold) 56%, #7a581a 100%);
+      display: grid;
+      place-items: center;
+      color: #111827;
+      font-weight: 900;
+      box-shadow: inset 0 0 0 3px rgba(255,255,255,.28);
+      flex: 0 0 auto;
+    }
+
+    .brand h1 {
+      margin: 0;
+      font-size: 18px;
+      line-height: 1.1;
+      letter-spacing: 0;
+      white-space: nowrap;
+    }
+
+    .brand span {
+      display: block;
+      color: rgba(255,255,255,.72);
+      font-size: 12px;
+      margin-top: 0;
+      line-height: 1.35;
+      white-space: nowrap;
+      text-align: center;
+    }
+
+    nav {
+      display: grid;
+      gap: 8px;
+      margin: 24px 0;
+    }
+
+    nav button {
+      border: 0;
+      background: transparent;
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      color: rgba(255,255,255,.82);
+      padding: 11px 12px;
+      border-radius: 8px;
+      font-size: 14px;
+      cursor: pointer;
+      text-align: left;
+    }
+
+    nav button.active, nav button:hover {
+      background: rgba(255,255,255,.12);
+      color: #fff;
+    }
+
+    .sync-card {
+      border: 1px solid rgba(255,255,255,.16);
+      border-radius: 8px;
+      padding: 14px;
+      background: rgba(255,255,255,.07);
+    }
+
+    .sync-card p {
+      margin: 0 0 12px;
+      color: rgba(255,255,255,.76);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    main {
+      min-width: 0;
+      padding: 28px;
+    }
+
+    .topbar {
+      display: flex;
+      justify-content: space-between;
+      gap: 18px;
+      align-items: flex-start;
+      margin-bottom: 22px;
+    }
+
+    .title h2 {
+      margin: 0 0 6px;
+      font-size: clamp(25px, 3vw, 36px);
+      line-height: 1.08;
+      letter-spacing: 0;
+      color: var(--navy);
+    }
+
+    .title p {
+      margin: 0;
+      max-width: 760px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .actions {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+      justify-content: flex-end;
+    }
+
+    .btn {
+      border: 1px solid var(--line);
+      background: #fff;
+      color: var(--ink);
+      border-radius: 8px;
+      min-height: 40px;
+      padding: 9px 13px;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      white-space: nowrap;
+    }
+
+    .btn.primary {
+      background: var(--navy);
+      color: #fff;
+      border-color: var(--navy);
+    }
+
+    .btn.gold {
+      background: var(--gold);
+      color: #111827;
+      border-color: var(--gold);
+      font-weight: 700;
+    }
+
+    .btn.ghost {
+      background: transparent;
+      border-color: rgba(255,255,255,.28);
+      color: #fff;
+      width: 100%;
+    }
+
+    .btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, nav button:focus-visible {
+      outline: 3px solid rgba(37,93,155,.25);
+      outline-offset: 2px;
+    }
+
+    .view { display: none; }
+    .view.active { display: block; }
+
+    .metrics {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(150px, 1fr));
+      gap: 14px;
+      margin-bottom: 18px;
+    }
+
+    .metric {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 16px;
+      box-shadow: 0 8px 20px rgba(20,33,61,.06);
+    }
+
+    .metric span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .06em;
+    }
+
+    .metric strong {
+      display: block;
+      margin-top: 8px;
+      color: var(--navy);
+      font-size: 28px;
+      line-height: 1;
+    }
+
+    .grid {
+      display: grid;
+      grid-template-columns: minmax(310px, .78fr) minmax(0, 1.35fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .new-turn-grid {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      overflow: hidden;
+    }
+
+    .panel-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .panel-header h3 {
+      margin: 0;
+      font-size: 17px;
+      color: var(--navy);
+      letter-spacing: 0;
+    }
+
+    .filters {
+      display: grid;
+      grid-template-columns: 1fr;
+      gap: 12px;
+      padding: 16px 18px;
+      border-bottom: 1px solid var(--line);
+      background: #fafbfc;
+    }
+
+    .field {
+      display: grid;
+      gap: 6px;
+      align-content: start;
+      min-width: 0;
+    }
+
+    .field label {
+      color: #344054;
+      font-size: 12px;
+      font-weight: 700;
+    }
+
+    .field-help {
+      margin: 0;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+    }
+
+    input, select, textarea {
+      width: 100%;
+      min-width: 0;
+      border: 1px solid #cfd6e2;
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      padding: 10px 11px;
+      min-height: 40px;
+    }
+
+    textarea { min-height: 82px; resize: vertical; }
+
+    .form-grid {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 12px;
+      align-items: start;
+    }
+
+    form {
+      padding: 18px;
+      display: grid;
+      gap: 13px;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      border-radius: 999px;
+      min-height: 25px;
+      padding: 4px 9px;
+      font-size: 12px;
+      font-weight: 700;
+      white-space: nowrap;
+    }
+
+    .badge.blue { background: var(--soft-blue); color: var(--blue); }
+    .badge.gold { background: var(--soft-gold); color: #7a581a; }
+    .badge.green { background: #dff8f5; color: var(--green); }
+    .badge.red { background: #fde8e6; color: var(--red); }
+
+    .lawyer-results, .candidate-list {
+      display: grid;
+      gap: 10px;
+      padding: 14px;
+      max-height: 620px;
+      overflow: auto;
+    }
+
+    .lawyer-option, .candidate {
+      border: 1px solid #e1e7ef;
+      border-radius: 8px;
+      padding: 12px;
+      background: linear-gradient(90deg, #fff, #f9fbfe);
+    }
+
+    .lawyer-option {
+      width: 100%;
+      text-align: left;
+      cursor: pointer;
+      display: grid;
+      gap: 6px;
+    }
+
+    .lawyer-option:hover, .lawyer-option.active {
+      border-color: var(--blue);
+      box-shadow: 0 8px 18px rgba(37,93,155,.12);
+    }
+
+    .lawyer-option strong, .candidate strong {
+      color: var(--navy);
+      display: block;
+    }
+
+    .muted {
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .empty {
+      padding: 22px;
+      color: var(--muted);
+      line-height: 1.5;
+    }
+
+    .profile {
+      display: grid;
+      gap: 18px;
+      padding: 18px;
+    }
+
+    .profile-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+      border-bottom: 1px solid #edf0f5;
+      padding-bottom: 16px;
+    }
+
+    .profile-head h3 {
+      margin: 0 0 4px;
+      font-size: 24px;
+      color: var(--navy);
+      letter-spacing: 0;
+    }
+
+    .contact-grid, .summary-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr));
+      gap: 12px;
+    }
+
+    .info-box {
+      border: 1px solid #e1e7ef;
+      border-radius: 8px;
+      padding: 12px;
+      background: #fff;
+      min-width: 0;
+    }
+
+    .info-box span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      margin-bottom: 5px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .info-box strong, .info-box a {
+      color: var(--ink);
+      overflow-wrap: anywhere;
+      text-decoration: none;
+    }
+
+    .chips {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .table-wrap { overflow: auto; }
+
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      min-width: 760px;
+    }
+
+    th, td {
+      padding: 12px 14px;
+      text-align: left;
+      border-bottom: 1px solid #edf0f5;
+      vertical-align: middle;
+      font-size: 14px;
+    }
+
+    th {
+      color: #475467;
+      font-size: 12px;
+      text-transform: uppercase;
+      letter-spacing: .05em;
+      background: #fff;
+    }
+
+    .rank-controls {
+      padding: 16px 18px;
+      background: #fafbfc;
+      border-bottom: 1px solid var(--line);
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 12px;
+      align-items: end;
+    }
+
+    .range-buttons {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .range-buttons button {
+      min-height: 40px;
+      min-width: 86px;
+      padding: 0 12px;
+      border: 1px solid #cfd6e2;
+      background: #fff;
+      color: var(--ink);
+      border-radius: 8px;
+      cursor: pointer;
+      font-weight: 700;
+      font-size: 16px;
+      line-height: 1;
+      white-space: nowrap;
+    }
+
+    .range-buttons button.active {
+      background: var(--navy);
+      border-color: var(--navy);
+      color: #fff;
+    }
+
+    .candidate-list {
+      padding: 18px;
+      max-height: none;
+    }
+
+    .ranking-summary {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .candidate {
+      display: grid;
+      gap: 10px;
+    }
+
+    .candidate-top {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 12px;
+    }
+
+    .candidate-actions {
+      display: flex;
+      gap: 8px;
+      flex-wrap: wrap;
+      align-items: center;
+    }
+
+    .score {
+      min-width: 82px;
+      border-radius: 8px;
+      background: var(--navy);
+      color: #fff;
+      padding: 8px 10px;
+      text-align: center;
+      font-weight: 800;
+    }
+
+    .score span {
+      display: block;
+      font-size: 11px;
+      color: rgba(255,255,255,.72);
+      font-weight: 600;
+    }
+
+    .toast {
+      position: fixed;
+      right: 22px;
+      bottom: 22px;
+      background: var(--navy);
+      color: #fff;
+      border-radius: 8px;
+      padding: 12px 14px;
+      box-shadow: var(--shadow);
+      transform: translateY(18px);
+      opacity: 0;
+      pointer-events: none;
+      transition: .22s ease;
+      max-width: min(420px, calc(100vw - 32px));
+    }
+
+    .toast.visible {
+      transform: translateY(0);
+      opacity: 1;
+    }
+
+    .back-top {
+      position: fixed;
+      right: 22px;
+      bottom: 82px;
+      z-index: 20;
+      border: 1px solid var(--navy);
+      background: var(--navy);
+      color: #fff;
+      border-radius: 999px;
+      min-height: 42px;
+      padding: 9px 14px;
+      box-shadow: var(--shadow);
+      cursor: pointer;
+      opacity: 0;
+      transform: translateY(12px);
+      pointer-events: none;
+      transition: .2s ease;
+      font-weight: 800;
+    }
+
+    .back-top.visible {
+      opacity: 1;
+      transform: translateY(0);
+      pointer-events: auto;
+    }
+
+    .save-note {
+      margin: 0 18px 16px;
+      border: 1px solid #e1e7ef;
+      border-radius: 8px;
+      padding: 12px;
+      background: #fafbfc;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .alert-grid {
+      padding: 18px;
+      display: grid;
+      grid-template-columns: repeat(4, minmax(150px, 1fr));
+      gap: 12px;
+    }
+
+    .alert-box {
+      border: 1px solid #e1e7ef;
+      border-radius: 8px;
+      padding: 12px;
+      background: #fff;
+    }
+
+    .alert-box span {
+      display: block;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .alert-box strong {
+      display: block;
+      margin-top: 6px;
+      color: var(--navy);
+      font-size: 24px;
+    }
+
+    .proposal-list {
+      padding: 0 18px 18px;
+      overflow: auto;
+    }
+
+    .candidate-check {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      font-weight: 800;
+      color: var(--navy);
+    }
+
+    .candidate-check input {
+      width: 18px;
+      min-height: 18px;
+    }
+
+    .candidate-facts {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .last-save {
+      margin: 0 18px 16px;
+      border: 1px solid #cce7df;
+      border-radius: 8px;
+      padding: 12px;
+      background: #f0fbf8;
+      color: #155e54;
+      font-size: 13px;
+      line-height: 1.45;
+      display: none;
+    }
+
+    .last-save.visible { display: block; }
+
+    .modal-backdrop {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: none;
+      place-items: center;
+      padding: 18px;
+      background: rgba(12, 20, 35, .48);
+    }
+
+    .modal-backdrop.visible { display: grid; }
+
+    .modal {
+      width: min(680px, 100%);
+      max-height: calc(100vh - 36px);
+      overflow: auto;
+      background: #fff;
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      border: 1px solid var(--line);
+    }
+
+    .modal header {
+      padding: 18px;
+      border-bottom: 1px solid var(--line);
+    }
+
+    .modal header h3 {
+      margin: 0;
+      color: var(--navy);
+      letter-spacing: 0;
+    }
+
+    .modal-body {
+      padding: 18px;
+      display: grid;
+      gap: 12px;
+    }
+
+    .modal-actions {
+      padding: 16px 18px;
+      display: flex;
+      gap: 10px;
+      justify-content: flex-end;
+      border-top: 1px solid var(--line);
+    }
+
+    .warning-list {
+      margin: 0;
+      padding-left: 20px;
+      color: var(--red);
+      line-height: 1.5;
+    }
+
+    @media (max-width: 1100px) {
+      .app-shell { grid-template-columns: 1fr; }
+      aside {
+        position: static;
+        height: auto;
+      }
+      nav {
+        grid-template-columns: repeat(2, minmax(120px, 1fr));
+        margin-bottom: 0;
+      }
+      .sync-card { display: none; }
+      .grid, .new-turn-grid { grid-template-columns: 1fr; }
+      .metrics { grid-template-columns: repeat(2, minmax(150px, 1fr)); }
+    }
+
+    @media (max-width: 760px) {
+      main, aside { padding: 18px; }
+      .topbar, .profile-head { display: grid; }
+      .actions { justify-content: stretch; }
+      .actions .btn { flex: 1; }
+      .metrics, .contact-grid, .summary-grid, .form-grid, .rank-controls { grid-template-columns: 1fr; }
+      .panel-header { align-items: flex-start; flex-direction: column; }
+      .range-buttons button { min-width: 78px; }
+    }
+  </style>
+</head>
+<body>
+  <div class="app-shell">
+    <aside>
+      <div class="brand">
+        <div class="brand-main">
+          <img class="brand-logo" src="logo.png" alt="Poder Judicial República de Chile">
+          <h1>Turno de Abogados</h1>
+        </div>
+        <span>Corte de Apelaciones de La Serena</span>
+      </div>
+      <nav aria-label="Secciones">
+        <button class="active" type="button" data-view="search">Buscar abogado</button>
+        <button type="button" data-view="newTurn">Nuevo turno</button>
+      </nav>
+      <div class="sync-card">
+        <p>Datos conectados a la planilla Google Sheets entregada. La sincronización actualiza búsqueda, ficha y ranking.</p>
+        <button class="btn ghost" id="syncButton" type="button">Sincronizar datos</button>
+      </div>
+    </aside>
+
+    <main>
+      <section class="topbar">
+        <div class="title">
+          <h2 id="pageTitle">Consulta institucional de abogados</h2>
+          <p id="pageSubtitle">Busca libremente por nombre, revisa datos de contacto y consulta todos los turnos realizados por año, mes, tribunal y materia.</p>
+        </div>
+        <div class="actions">
+          <button class="btn" id="refreshButton" type="button">Actualizar datos</button>
+          <button class="btn primary" id="goNewTurn" type="button">Nuevo turno</button>
+        </div>
+      </section>
+
+      <section class="metrics" aria-label="Indicadores">
+        <div class="metric"><span>Turnos registrados</span><strong id="metricTotal">0</strong></div>
+        <div class="metric"><span>Abogados</span><strong id="metricLawyers">0</strong></div>
+        <div class="metric"><span>Tribunales</span><strong id="metricCourts">0</strong></div>
+        <div class="metric"><span>Materias</span><strong id="metricSubjects">0</strong></div>
+      </section>
+
+      <section class="view active" id="searchView">
+        <div class="grid">
+          <section class="panel">
+            <div class="panel-header">
+              <h3>Búsqueda libre</h3>
+              <span class="badge blue" id="lawyerCount">0 abogados</span>
+            </div>
+            <div class="filters">
+              <div class="field">
+                <label for="searchName">Nombre del abogado</label>
+                <input id="searchName" type="search" placeholder="Ej. Paulo, Paula, Gallo, Bustos">
+              </div>
+              <div class="field">
+                <label for="searchSubject">Materia</label>
+                <select id="searchSubject"><option value="">Todas</option></select>
+              </div>
+              <div class="field">
+                <label for="searchCourt">Tribunal</label>
+                <select id="searchCourt"><option value="">Todos</option></select>
+              </div>
+            </div>
+            <div class="lawyer-results" id="lawyerResults"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h3>Ficha del abogado</h3>
+              <span class="badge gold" id="selectedBadge">Seleccione</span>
+            </div>
+            <div id="lawyerDetail" class="empty">Escribe un nombre y selecciona un abogado para ver contacto, especialidades e historial completo de turnos.</div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="newTurnView">
+        <div class="new-turn-grid">
+          <section class="panel">
+            <div class="panel-header">
+              <h3>Panel de alertas</h3>
+              <span class="badge red">Calidad de datos</span>
+            </div>
+            <div class="alert-grid" id="alertPanel"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h3>Ranking para próximo turno</h3>
+              <span class="badge green" id="nextMonthLabel">Próximo mes</span>
+            </div>
+            <div class="rank-controls">
+              <div class="field">
+                <label for="suggestSubject">Materia requerida</label>
+                <select id="suggestSubject"><option value="">Cualquiera</option></select>
+              </div>
+              <div class="field">
+                <label for="suggestCourt">Tribunal requerido</label>
+                <select id="suggestCourt"><option value="">Cualquiera</option></select>
+              </div>
+              <div class="field">
+                <label>Meses sin turno</label>
+                <div class="range-buttons" id="monthRangeButtons" aria-label="Rango de meses sin turno">
+                  <button class="active" type="button" data-min-months="0">Todos</button>
+                  <button type="button" data-min-months="6">6+</button>
+                  <button type="button" data-min-months="12">12+</button>
+                  <button type="button" data-min-months="24">24+</button>
+                  <button type="button" data-min-months="36">36+</button>
+                </div>
+              </div>
+              <button class="btn gold" id="suggestButton" type="button">Actualizar ranking</button>
+            </div>
+            <p class="ranking-summary" id="rankingSummary" style="padding:14px 18px 0;">El ranking se ordena por meses sin turno y afinidad con la materia o tribunal seleccionado.</p>
+            <div class="candidate-list" id="candidateList"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h3>Propuesta mensual</h3>
+              <span class="badge blue" id="proposalCount">0 seleccionados</span>
+            </div>
+            <div class="proposal-list" id="proposalList">
+              <div class="empty">Selecciona candidatos desde el ranking para armar la propuesta mensual.</div>
+            </div>
+            <div style="padding:0 18px 18px;">
+              <button class="btn primary" id="exportProposalButton" type="button">Exportar propuesta a PDF</button>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h3>Registrar nuevo turno</h3>
+              <span class="badge gold">Formulario</span>
+            </div>
+            <p class="save-note"><strong>Importante:</strong> Publicar la hoja en la web permite leer datos. Para guardar nuevos turnos en Google Sheets se necesita publicar un Google Apps Script como aplicación web y pegar su URL en <strong>GOOGLE_APPS_SCRIPT_URL</strong>. Mientras esa URL esté vacía, el guardado queda solo en esta página.</p>
+            <p class="last-save" id="lastSaveStatus"></p>
+            <form id="turnForm" novalidate>
+              <div class="field">
+                <label for="lawyerName">Nombre</label>
+                <input id="lawyerName" required placeholder="Ej. Carolina Reyes">
+              </div>
+              <div class="form-grid">
+                <div class="field">
+                  <label for="lawyerEmail">Correo(s) / contacto</label>
+                  <input id="lawyerEmail" type="text" inputmode="email" placeholder="correo@dominio.cl / otro@dominio.cl">
+                  <p class="field-help">Acepta uno o varios correos, tal como figuren en la planilla.</p>
+                </div>
+                <div class="field">
+                  <label for="lawyerPhone">Teléfono</label>
+                  <input id="lawyerPhone" placeholder="+56 9 1234 5678">
+                </div>
+              </div>
+              <div class="field">
+                <label for="lawyerAddress">Dirección</label>
+                <input id="lawyerAddress" placeholder="Domicilio profesional">
+              </div>
+              <div class="form-grid">
+                <div class="field">
+                  <label for="courtInput">Tribunal</label>
+                  <input id="courtInput" list="courtOptions" required placeholder="Ej. Primer Juzgado de Letras">
+                  <datalist id="courtOptions"></datalist>
+                </div>
+                <div class="field">
+                  <label for="subjectInput">Materia</label>
+                  <input id="subjectInput" list="subjectOptions" required placeholder="Ej. Civil">
+                  <datalist id="subjectOptions"></datalist>
+                </div>
+              </div>
+              <div class="form-grid">
+                <div class="field">
+                  <label for="turnDate">Mes del turno</label>
+                  <input id="turnDate" type="month" required>
+                </div>
+                <div class="field">
+                  <label for="statusInput">Estado</label>
+                  <select id="statusInput">
+                    <option>Programado</option>
+                    <option>Original vigente</option>
+                    <option>Cumplido</option>
+                    <option>Reemplazo</option>
+                    <option>Reagendado</option>
+                  </select>
+                </div>
+              </div>
+              <div class="field">
+                <label for="notesInput">Observaciones</label>
+                <textarea id="notesInput" placeholder="Disponibilidad, restricciones o antecedentes relevantes"></textarea>
+              </div>
+              <button class="btn primary" type="submit" id="saveLawyerButton">Guardar abogado(a)</button>
+            </form>
+          </section>
+        </div>
+      </section>
+    </main>
+  </div>
+
+  <div class="modal-backdrop" id="confirmModal" role="dialog" aria-modal="true" aria-labelledby="confirmTitle">
+    <div class="modal">
+      <header><h3 id="confirmTitle">Confirmar registro</h3></header>
+      <div class="modal-body" id="confirmBody"></div>
+      <div class="modal-actions">
+        <button class="btn" id="cancelConfirm" type="button">Cancelar</button>
+        <button class="btn primary" id="acceptConfirm" type="button">Confirmar y guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <button class="back-top" id="backTop" type="button">Arriba</button>
+  <div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+  <script>
+    const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1QokQhh5qGZ9YyOO1gAI0QKBSY7C8DQGg/export?format=csv&gid=548764708";
+    const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwpH3WBmXItfCPJS6AysV01jYFI8BuPLAYSws2rL9Qb8WM-jKHbplBj_XUfGQ0zH6yX/exec";
+
+    const seedTurns = [
+      { name: "Carolina Reyes M.", id: "12.345.678-9", address: "Monjitas 527, Santiago", phone: "+56 9 1111 2222", email: "carolina@example.cl", court: "1° Juzgado Civil", subject: "Civil", date: "2026-01-01", year: "2026", month: "Enero", status: "Cumplido", notes: "Dato de ejemplo" },
+      { name: "Matías Fuentes R.", id: "15.884.201-4", address: "Estado 360, Santiago", phone: "+56 9 3333 4444", email: "matias@example.cl", court: "Tribunal de Familia", subject: "Familia", date: "2026-02-01", year: "2026", month: "Febrero", status: "Cumplido", notes: "Dato de ejemplo" },
+      { name: "Valentina Soto A.", id: "17.552.018-1", address: "Prat 814, La Serena", phone: "+56 9 5555 6666", email: "valentina@example.cl", court: "Juzgado de Garantía", subject: "Penal", date: "2026-03-01", year: "2026", month: "Marzo", status: "Cumplido", notes: "Dato de ejemplo" }
+    ];
+
+    let turns = [...seedTurns];
+    let selectedLawyerKey = "";
+    let rankingMinMonths = 0;
+    let pendingTurn = null;
+    const selectedProposalKeys = new Set();
+
+    const els = {
+      searchName: document.querySelector("#searchName"),
+      searchSubject: document.querySelector("#searchSubject"),
+      searchCourt: document.querySelector("#searchCourt"),
+      lawyerResults: document.querySelector("#lawyerResults"),
+      lawyerDetail: document.querySelector("#lawyerDetail"),
+      lawyerCount: document.querySelector("#lawyerCount"),
+      selectedBadge: document.querySelector("#selectedBadge"),
+      suggestCourt: document.querySelector("#suggestCourt"),
+      suggestSubject: document.querySelector("#suggestSubject"),
+      candidateList: document.querySelector("#candidateList"),
+      monthRangeButtons: document.querySelector("#monthRangeButtons"),
+      rankingSummary: document.querySelector("#rankingSummary"),
+      alertPanel: document.querySelector("#alertPanel"),
+      proposalList: document.querySelector("#proposalList"),
+      proposalCount: document.querySelector("#proposalCount"),
+      exportProposalButton: document.querySelector("#exportProposalButton"),
+      confirmModal: document.querySelector("#confirmModal"),
+      confirmBody: document.querySelector("#confirmBody"),
+      cancelConfirm: document.querySelector("#cancelConfirm"),
+      acceptConfirm: document.querySelector("#acceptConfirm"),
+      lastSaveStatus: document.querySelector("#lastSaveStatus"),
+      backTop: document.querySelector("#backTop"),
+      toast: document.querySelector("#toast")
+    };
+
+    const dateFmt = new Intl.DateTimeFormat("es-CL", { day: "2-digit", month: "short", year: "numeric" });
+    const monthFmt = new Intl.DateTimeFormat("es-CL", { month: "long", year: "numeric" });
+
+    function escapeHtml(value) {
+      return String(value ?? "").replace(/[&<>"']/g, char => ({
+        "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#039;"
+      }[char]));
+    }
+
+    function normalize(value) {
+      return String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+    }
+
+    function parseDate(value) {
+      return new Date(`${value}T12:00:00`);
+    }
+
+    function personKey(turnOrValue) {
+      if (typeof turnOrValue === "object") {
+        return normalize(`${turnOrValue.name}|${turnOrValue.email || turnOrValue.id || ""}`);
+      }
+      return String(turnOrValue || "");
+    }
+
+    function displayValue(value) {
+      return value && String(value).trim() ? escapeHtml(value) : "Sin información";
+    }
+
+    function hasData(value) {
+      const text = normalize(value);
+      return Boolean(text) && !text.includes("no informado") && text !== "sin informacion";
+    }
+
+    function isActiveValue(value) {
+      const text = normalize(value || "si");
+      return text !== "no" && text !== "inactivo" && !text.includes("no procesar");
+    }
+
+    function uniqueValues(list, key) {
+      return [...new Set(list.map(item => item[key]).filter(Boolean))]
+        .sort((a, b) => a.localeCompare(b, "es"));
+    }
+
+    function groupLawyers() {
+      const profiles = new Map();
+      turns.forEach(turn => {
+        const key = personKey(turn);
+        if (!profiles.has(key)) {
+          profiles.set(key, {
+            key,
+            name: turn.name,
+            id: turn.id,
+            address: turn.address,
+            phone: turn.phone,
+            email: turn.email,
+            turns: []
+          });
+        }
+        const profile = profiles.get(key);
+        profile.turns.push(turn);
+        profile.address ||= turn.address;
+        profile.phone ||= turn.phone;
+        profile.email ||= turn.email;
+      });
+      return [...profiles.values()].map(profile => {
+        profile.turns.sort((a, b) => parseDate(b.date) - parseDate(a.date));
+        profile.subjects = uniqueValues(profile.turns, "subject");
+        profile.courts = uniqueValues(profile.turns, "court");
+        profile.lastTurn = profile.turns[0];
+        profile.active = isActiveValue(profile.lastTurn?.active);
+        profile.monthsWithoutTurn = monthsSince(profile.lastTurn?.date);
+        return profile;
+      }).sort((a, b) => a.name.localeCompare(b.name, "es"));
+    }
+
+    function monthsSince(dateValue) {
+      if (!dateValue) return 0;
+      const now = new Date();
+      const date = parseDate(dateValue);
+      return Math.max(0, (now.getFullYear() - date.getFullYear()) * 12 + now.getMonth() - date.getMonth());
+    }
+
+    function topSubjects(profile) {
+      const counts = new Map();
+      profile.turns.forEach(turn => counts.set(turn.subject, (counts.get(turn.subject) || 0) + 1));
+      return [...counts.entries()]
+        .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "es"))
+        .map(([subject]) => subject)
+        .filter(Boolean);
+    }
+
+    function fillSelect(select, values) {
+      const current = select.value;
+      const first = select.querySelector("option")?.outerHTML || "";
+      select.innerHTML = first + values.map(value => `<option value="${escapeHtml(value)}">${escapeHtml(value)}</option>`).join("");
+      if (values.includes(current)) select.value = current;
+    }
+
+    function fillDatalist(datalist, values) {
+      if (!datalist) return;
+      datalist.innerHTML = values.map(value => `<option value="${escapeHtml(value)}"></option>`).join("");
+    }
+
+    function populateFilters() {
+      const subjects = uniqueValues(turns, "subject");
+      const courts = uniqueValues(turns, "court");
+      fillSelect(els.searchSubject, subjects);
+      fillSelect(els.suggestSubject, subjects);
+      fillSelect(els.searchCourt, courts);
+      fillSelect(els.suggestCourt, courts);
+      fillDatalist(document.querySelector("#courtOptions"), courts);
+      fillDatalist(document.querySelector("#subjectOptions"), subjects);
+    }
+
+    function filteredProfiles() {
+      const text = normalize(els.searchName.value);
+      const subject = els.searchSubject.value;
+      const court = els.searchCourt.value;
+      return groupLawyers().filter(profile => {
+        const matchesText = !text || normalize(`${profile.name} ${profile.email} ${profile.phone}`).includes(text);
+        const matchesSubject = !subject || profile.subjects.includes(subject);
+        const matchesCourt = !court || profile.courts.includes(court);
+        return matchesText && matchesSubject && matchesCourt;
+      });
+    }
+
+    function renderLawyerResults() {
+      const profiles = filteredProfiles();
+      els.lawyerCount.textContent = `${profiles.length} abogado${profiles.length === 1 ? "" : "s"}`;
+      if (!profiles.length) {
+        els.lawyerResults.innerHTML = `<div class="empty">No hay abogados que coincidan con la búsqueda.</div>`;
+        return;
+      }
+      els.lawyerResults.innerHTML = profiles.slice(0, 80).map(profile => `
+        <button class="lawyer-option ${profile.key === selectedLawyerKey ? "active" : ""}" type="button" data-key="${escapeHtml(profile.key)}">
+          <strong>${escapeHtml(profile.name)}</strong>
+          <span class="muted">${escapeHtml(profile.email || profile.phone || "Sin contacto registrado")}</span>
+          <span class="muted">${profile.turns.length} turno${profile.turns.length === 1 ? "" : "s"} · Último: ${profile.lastTurn ? escapeHtml(profile.lastTurn.month + " " + profile.lastTurn.year) : "Sin fecha"}</span>
+        </button>
+      `).join("");
+    }
+
+    function selectLawyer(key) {
+      selectedLawyerKey = key;
+      const profile = groupLawyers().find(item => item.key === key);
+      renderLawyerResults();
+      renderLawyerDetail(profile);
+    }
+
+    function renderLawyerDetail(profile) {
+      if (!profile) {
+        els.selectedBadge.textContent = "Seleccione";
+        els.lawyerDetail.className = "empty";
+        els.lawyerDetail.innerHTML = "Selecciona un abogado de la lista para revisar su información.";
+        return;
+      }
+      els.selectedBadge.textContent = `${profile.turns.length} turnos`;
+      els.lawyerDetail.className = "profile";
+      const specialties = topSubjects(profile);
+      els.lawyerDetail.innerHTML = `
+        <div class="profile-head">
+          <div>
+            <h3>${escapeHtml(profile.name)}</h3>
+            <p class="muted">${profile.monthsWithoutTurn} meses sin turno · Último turno: ${profile.lastTurn ? escapeHtml(profile.lastTurn.month + " " + profile.lastTurn.year) : "Sin registro"}</p>
+          </div>
+          <span class="badge green">Especialidad sugerida: ${escapeHtml(specialties[0] || "Sin historial")}</span>
+        </div>
+        <div class="contact-grid">
+          <div class="info-box"><span>Dirección</span><strong>${displayValue(profile.address)}</strong></div>
+          <div class="info-box"><span>Teléfono</span><strong>${displayValue(profile.phone)}</strong></div>
+          <div class="info-box"><span>Correo</span>${profile.email ? `<a href="mailto:${escapeHtml(profile.email)}">${escapeHtml(profile.email)}</a>` : "<strong>Sin información</strong>"}</div>
+        </div>
+        <div class="summary-grid">
+          <div class="info-box"><span>Materias históricas</span><div class="chips">${profile.subjects.map(item => `<span class="badge gold">${escapeHtml(item)}</span>`).join("")}</div></div>
+          <div class="info-box"><span>Tribunales</span><strong>${escapeHtml(profile.courts.length)} registrados</strong></div>
+          <div class="info-box"><span>Total de turnos</span><strong>${profile.turns.length}</strong></div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Año</th>
+                <th>Mes</th>
+                <th>Tribunal</th>
+                <th>Materia</th>
+                <th>Estado</th>
+                <th>Observaciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${profile.turns.map(turn => `
+                <tr>
+                  <td>${escapeHtml(turn.year)}</td>
+                  <td>${escapeHtml(turn.month)}</td>
+                  <td>${escapeHtml(turn.court)}</td>
+                  <td><span class="badge gold">${escapeHtml(turn.subject)}</span></td>
+                  <td>${escapeHtml(turn.status)}</td>
+                  <td>${displayValue(turn.notes)}</td>
+                </tr>
+              `).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
+    function renderMetrics() {
+      const profiles = groupLawyers();
+      document.querySelector("#metricTotal").textContent = turns.length;
+      document.querySelector("#metricLawyers").textContent = profiles.length;
+      document.querySelector("#metricCourts").textContent = uniqueValues(turns, "court").length;
+      document.querySelector("#metricSubjects").textContent = uniqueValues(turns, "subject").length;
+    }
+
+    function renderAlerts() {
+      const profiles = groupLawyers();
+      const missingEmail = profiles.filter(profile => !hasData(profile.email)).length;
+      const missingPhone = profiles.filter(profile => !hasData(profile.phone)).length;
+      const missingAddress = profiles.filter(profile => !hasData(profile.address)).length;
+      const inactive = profiles.filter(profile => !profile.active).length;
+      els.alertPanel.innerHTML = `
+        <div class="alert-box"><span>Sin correo</span><strong>${missingEmail}</strong></div>
+        <div class="alert-box"><span>Sin teléfono</span><strong>${missingPhone}</strong></div>
+        <div class="alert-box"><span>Sin domicilio</span><strong>${missingAddress}</strong></div>
+        <div class="alert-box"><span>Excluidos del ranking</span><strong>${inactive}</strong></div>
+      `;
+    }
+
+    function renderProposal() {
+      const profiles = groupLawyers().filter(profile => selectedProposalKeys.has(profile.key));
+      els.proposalCount.textContent = `${profiles.length} seleccionado${profiles.length === 1 ? "" : "s"}`;
+      if (!profiles.length) {
+        els.proposalList.innerHTML = `<div class="empty">Selecciona candidatos desde el ranking para armar la propuesta mensual.</div>`;
+        return;
+      }
+
+      els.proposalList.innerHTML = `
+        <table>
+          <thead>
+            <tr>
+              <th>Abogado(a)</th>
+              <th>Meses sin turno</th>
+              <th>Materias previas</th>
+              <th>Último tribunal</th>
+              <th>Teléfono</th>
+              <th>Dirección</th>
+              <th>Email</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${profiles.map(profile => `
+              <tr>
+                <td>${escapeHtml(profile.name)}</td>
+                <td>${profile.monthsWithoutTurn}</td>
+                <td>${escapeHtml(profile.subjects.join(", "))}</td>
+                <td>${escapeHtml(profile.lastTurn?.court || "")}</td>
+                <td>${escapeHtml(profile.phone || "Sin teléfono")}</td>
+                <td>${escapeHtml(profile.address || "Sin dirección")}</td>
+                <td>${escapeHtml(profile.email || "Sin email")}</td>
+              </tr>
+            `).join("")}
+          </tbody>
+        </table>
+      `;
+    }
+
+    function exportProposalPdf() {
+      const profiles = groupLawyers().filter(profile => selectedProposalKeys.has(profile.key));
+      if (!profiles.length) {
+        showToast("Selecciona al menos un candidato para exportar la propuesta.");
+        return;
+      }
+
+      const month = document.querySelector("#nextMonthLabel").textContent;
+      const rows = profiles.map((profile, index) => `
+        <tr>
+          <td>${index + 1}</td>
+          <td>${escapeHtml(profile.name)}</td>
+          <td>${profile.monthsWithoutTurn}</td>
+          <td>${escapeHtml(profile.subjects.join(", "))}</td>
+          <td>${escapeHtml(profile.lastTurn?.court || "")}</td>
+          <td>${escapeHtml(profile.phone || "Sin teléfono")}</td>
+          <td>${escapeHtml(profile.address || "Sin dirección")}</td>
+          <td>${escapeHtml(profile.email || "Sin email")}</td>
+        </tr>
+      `).join("");
+
+      const printWindow = window.open("", "_blank");
+      printWindow.document.write(`
+        <!doctype html>
+        <html lang="es">
+        <head>
+          <meta charset="utf-8">
+          <title>Propuesta mensual de turnos</title>
+          <style>
+            body { font-family: Arial, sans-serif; color: #172033; margin: 32px; }
+            h1 { color: #14213d; margin-bottom: 4px; }
+            p { color: #667085; }
+            table { width: 100%; border-collapse: collapse; margin-top: 18px; }
+            th, td { border: 1px solid #d8dee9; padding: 8px; text-align: left; font-size: 12px; }
+            th { background: #e8f0fa; color: #14213d; }
+          </style>
+        </head>
+        <body>
+          <h1>Propuesta mensual de turnos</h1>
+          <p>Periodo sugerido: ${escapeHtml(month)} · Generado: ${new Date().toLocaleString("es-CL")}</p>
+          <table>
+            <thead>
+              <tr>
+                <th>#</th>
+                <th>Abogado(a)</th>
+                <th>Meses sin turno</th>
+                <th>Materias previas</th>
+                <th>Último tribunal</th>
+                <th>Teléfono</th>
+                <th>Dirección</th>
+                <th>Email</th>
+              </tr>
+            </thead>
+            <tbody>${rows}</tbody>
+          </table>
+        </body>
+        </html>
+      `);
+      printWindow.document.close();
+      printWindow.focus();
+      printWindow.print();
+    }
+
+    function nextMonthLabel() {
+      const now = new Date();
+      const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      document.querySelector("#nextMonthLabel").textContent = monthFmt.format(next);
+    }
+
+    function nextMonthValue() {
+      const now = new Date();
+      const next = new Date(now.getFullYear(), now.getMonth() + 1, 1);
+      return `${next.getFullYear()}-${String(next.getMonth() + 1).padStart(2, "0")}`;
+    }
+
+    function rankingReasons(profile, subject, court) {
+      const reasons = [`${profile.monthsWithoutTurn} meses sin turno`];
+      if (subject && profile.subjects.includes(subject)) reasons.push(`ha trabajado materia ${subject}`);
+      if (court && profile.courts.includes(court)) reasons.push(`registra turnos en ${court}`);
+      if (profile.turns.length > 1) reasons.push(`${profile.turns.length} turnos históricos, con penalización por repetición`);
+      return reasons.join("; ");
+    }
+
+    function renderCandidates() {
+      const subject = els.suggestSubject.value;
+      const court = els.suggestCourt.value;
+      const activeProfiles = groupLawyers().filter(profile => profile.active);
+      const ranked = activeProfiles.map(profile => {
+        const specialties = topSubjects(profile);
+        const subjectAffinity = subject && profile.subjects.includes(subject) ? 8 : 0;
+        const courtAffinity = court && profile.courts.includes(court) ? 4 : 0;
+        const repeatPenalty = Math.max(0, profile.turns.length - 1) * 2;
+        const score = profile.monthsWithoutTurn * 3 + subjectAffinity + courtAffinity - repeatPenalty;
+        return { ...profile, specialties, score };
+      }).filter(profile => {
+        const matchesSubject = !subject || profile.subjects.includes(subject);
+        const matchesCourt = !court || profile.courts.includes(court);
+        const matchesMonths = profile.monthsWithoutTurn >= rankingMinMonths;
+        return matchesSubject && matchesCourt && matchesMonths;
+      }).sort((a, b) => b.score - a.score || b.monthsWithoutTurn - a.monthsWithoutTurn || a.name.localeCompare(b.name, "es"));
+
+      const candidates = ranked.length ? ranked : activeProfiles.map(profile => {
+        const specialties = topSubjects(profile);
+        const repeatPenalty = Math.max(0, profile.turns.length - 1) * 2;
+        return { ...profile, specialties, score: profile.monthsWithoutTurn * 3 - repeatPenalty };
+      }).filter(profile => profile.monthsWithoutTurn >= rankingMinMonths)
+        .sort((a, b) => b.score - a.score || b.monthsWithoutTurn - a.monthsWithoutTurn || a.name.localeCompare(b.name, "es"));
+
+      els.rankingSummary.textContent = ranked.length
+        ? `${candidates.length} candidato${candidates.length === 1 ? "" : "s"} con ${rankingMinMonths}+ meses sin turno${subject ? ` para materia ${subject}` : ""}${court ? ` en ${court}` : ""}.`
+        : `No hay candidatos con todos los filtros seleccionados; se muestra el ranking general de ${candidates.length} abogados con ${rankingMinMonths}+ meses sin turno.`;
+
+      if (!candidates.length) {
+        els.candidateList.innerHTML = `<div class="empty">No hay abogados que cumplan el rango de meses seleccionado.</div>`;
+        return;
+      }
+
+      els.candidateList.innerHTML = candidates.map((candidate, index) => `
+        <article class="candidate" data-key="${escapeHtml(candidate.key)}">
+          <div class="candidate-top">
+            <div>
+              <label class="candidate-check">
+                <input type="checkbox" class="proposal-check" data-key="${escapeHtml(candidate.key)}" ${selectedProposalKeys.has(candidate.key) ? "checked" : ""}>
+                <span>${index + 1}. ${escapeHtml(candidate.name)}</span>
+              </label>
+              <p class="muted">${displayValue(candidate.email || candidate.phone)} · ${candidate.turns.length} turno${candidate.turns.length === 1 ? "" : "s"} histórico${candidate.turns.length === 1 ? "" : "s"}</p>
+            </div>
+            <div class="score">${candidate.monthsWithoutTurn}<span>meses sin turno</span></div>
+          </div>
+          <div class="candidate-facts">
+            <span class="badge gold">Materia sugerida: ${escapeHtml(candidate.specialties[0] || subject || "Sin historial")}</span>
+            <span class="badge blue">Último tribunal: ${escapeHtml(candidate.lastTurn?.court || "Sin registro")}</span>
+          </div>
+          <p class="muted"><strong>Por qué aparece:</strong> ${escapeHtml(rankingReasons(candidate, subject, court))}.</p>
+          <div class="candidate-actions">
+            <button class="btn primary use-candidate" type="button" data-key="${escapeHtml(candidate.key)}">Usar este abogado</button>
+          </div>
+        </article>
+      `).join("");
+    }
+
+    function useCandidate(key) {
+      const profile = groupLawyers().find(item => item.key === key);
+      if (!profile) return;
+      const subject = els.suggestSubject.value || topSubjects(profile)[0] || "";
+      const court = els.suggestCourt.value || profile.lastTurn?.court || "";
+      document.querySelector("#lawyerName").value = profile.name || "";
+      document.querySelector("#lawyerEmail").value = profile.email || "";
+      document.querySelector("#lawyerPhone").value = profile.phone || "";
+      document.querySelector("#lawyerAddress").value = profile.address || "";
+      document.querySelector("#subjectInput").value = subject;
+      document.querySelector("#courtInput").value = court;
+      if (!document.querySelector("#turnDate").value) {
+        document.querySelector("#turnDate").value = nextMonthValue();
+      }
+      document.querySelector("#lawyerName").focus();
+      showToast("Datos del abogado cargados en el formulario.");
+    }
+
+    function renderAll() {
+      populateFilters();
+      renderMetrics();
+      renderAlerts();
+      nextMonthLabel();
+      renderLawyerResults();
+      if (selectedLawyerKey) {
+        renderLawyerDetail(groupLawyers().find(profile => profile.key === selectedLawyerKey));
+      }
+      renderCandidates();
+      renderProposal();
+    }
+
+    function showView(view) {
+      document.querySelectorAll(".view").forEach(section => section.classList.remove("active"));
+      document.querySelector(`#${view}View`).classList.add("active");
+      document.querySelectorAll("nav button").forEach(button => button.classList.toggle("active", button.dataset.view === view));
+      const isNewTurn = view === "newTurn";
+      document.querySelector("#pageTitle").textContent = isNewTurn ? "Generar y registrar nuevo turno" : "Consulta institucional de abogados";
+      document.querySelector("#pageSubtitle").textContent = isNewTurn
+        ? "Revisa el ranking por meses sin turno, especialidades históricas y registra una nueva asignación."
+        : "Busca libremente por nombre, revisa datos de contacto y consulta todos los turnos realizados por año, mes, tribunal y materia.";
+    }
+
+    function showToast(message) {
+      els.toast.textContent = message;
+      els.toast.classList.add("visible");
+      window.setTimeout(() => els.toast.classList.remove("visible"), 2800);
+    }
+
+    function csvEscape(value) {
+      return `"${String(value ?? "").replace(/"/g, '""')}"`;
+    }
+
+    function exportCsv() {
+      const header = ["Nombre", "Correo", "Teléfono", "Dirección", "Tribunal", "Materia", "Fecha", "Estado", "Observaciones"];
+      const rows = turns.map(turn => [turn.name, turn.email, turn.phone, turn.address, turn.court, turn.subject, turn.date, turn.status, turn.notes]);
+      const csv = [header, ...rows].map(row => row.map(csvEscape).join(",")).join("\n");
+      const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = "turnos-abogados.csv";
+      link.click();
+      URL.revokeObjectURL(url);
+    }
+
+    function parseCsv(csv) {
+      const rows = [];
+      let row = [];
+      let field = "";
+      let quoted = false;
+      for (let i = 0; i < csv.length; i++) {
+        const char = csv[i];
+        const next = csv[i + 1];
+        if (char === '"' && quoted && next === '"') {
+          field += '"';
+          i++;
+        } else if (char === '"') {
+          quoted = !quoted;
+        } else if (char === "," && !quoted) {
+          row.push(field);
+          field = "";
+        } else if ((char === "\n" || char === "\r") && !quoted) {
+          if (char === "\r" && next === "\n") i++;
+          row.push(field);
+          if (row.some(value => value.trim())) rows.push(row);
+          row = [];
+          field = "";
+        } else {
+          field += char;
+        }
+      }
+      row.push(field);
+      if (row.some(value => value.trim())) rows.push(row);
+      return rows;
+    }
+
+    function mapRowsToTurns(headersRaw, rows) {
+      const headers = headersRaw.map(normalize);
+      const findHeader = keys => headers.findIndex(header => keys.some(key => header.includes(key)));
+      const findExact = key => headers.findIndex(header => header === normalize(key));
+      return rows.map(cols => {
+        const pick = (...keys) => {
+          const index = findHeader(keys.map(normalize));
+          return index >= 0 ? String(cols[index] ?? "").trim() : "";
+        };
+        const pickExact = key => {
+          const index = findExact(key);
+          return index >= 0 ? String(cols[index] ?? "").trim() : "";
+        };
+        const period = pick("periodo");
+        const year = pick("año turno", "ano turno");
+        const monthNumber = pick("mes n");
+        const month = pick("mes de turno") || (period ? monthFmt.format(parseDate(`${period}-01`)).split(" de ")[0] : "");
+        const date = period && /^\d{4}-\d{2}$/.test(period)
+          ? `${period}-01`
+          : year && monthNumber
+            ? `${year}-${String(monthNumber).padStart(2, "0")}-01`
+            : pick("fecha turno", "fecha");
+        return {
+          name: pick("abogado"),
+          id: pickExact("ID"),
+          address: pick("domicilio"),
+          phone: pick("fono", "telefono", "teléfono"),
+          email: pick("email", "correo"),
+          court: pick("tribunal", "unidad"),
+          subject: pick("materia"),
+          date,
+          year: year || date.slice(0, 4),
+          month: month || monthFmt.format(parseDate(date)),
+          status: pick("estado registro", "estado") || "Programado",
+          active: pick("activo para procesamiento", "activo") || "Sí",
+          notes: pick("observaciones", "documento fuente")
+        };
+      }).filter(turn => turn.name && turn.date);
+    }
+
+    function sheetUrlForGviz() {
+      return SHEET_CSV_URL
+        .replace("/export?format=csv&", "/gviz/tq?tqx=out:json&")
+        .replace("format=csv&", "");
+    }
+
+    function loadSheetViaGviz() {
+      return new Promise((resolve, reject) => {
+        const previousGoogle = window.google;
+        const script = document.createElement("script");
+        const cleanup = () => {
+          script.remove();
+          window.google = previousGoogle;
+        };
+        window.google = {
+          visualization: {
+            Query: {
+              setResponse(payload) {
+                try {
+                  const table = payload.table;
+                  const headers = table.cols.map(col => col.label || col.id || "");
+                  const rows = table.rows.map(row => table.cols.map((_, index) => {
+                    const cell = row.c[index];
+                    if (!cell) return "";
+                    return cell.f ?? cell.v ?? "";
+                  }));
+                  cleanup();
+                  resolve([headers, ...rows]);
+                } catch (error) {
+                  cleanup();
+                  reject(error);
+                }
+              }
+            }
+          }
+        };
+        script.onerror = () => {
+          cleanup();
+          reject(new Error("No se pudo cargar la planilla por respaldo gviz."));
+        };
+        script.src = `${sheetUrlForGviz()}&cacheBust=${Date.now()}`;
+        document.head.appendChild(script);
+      });
+    }
+
+    async function loadSheetRows() {
+      try {
+        const response = await fetch(`${SHEET_CSV_URL}&cacheBust=${Date.now()}`, { cache: "no-store" });
+        if (!response.ok) throw new Error(`HTTP ${response.status}`);
+        const csv = await response.text();
+        const rows = parseCsv(csv);
+        if (rows.length < 10) throw new Error("La respuesta CSV no contiene registros suficientes.");
+        return rows;
+      } catch (error) {
+        return loadSheetViaGviz();
+      }
+    }
+
+    async function syncFromSheet() {
+      showToast("Sincronizando planilla...");
+      const [headersRaw, ...rows] = await loadSheetRows();
+      const loadedTurns = mapRowsToTurns(headersRaw, rows);
+      if (loadedTurns.length < 10) throw new Error("La planilla no devolvió registros válidos.");
+      turns = loadedTurns;
+      selectedLawyerKey = "";
+      renderAll();
+      renderLawyerDetail(null);
+      showToast("Datos sincronizados desde Google Sheets.");
+    }
+
+    function saveTurnToGoogleSheet(turn) {
+      if (!GOOGLE_APPS_SCRIPT_URL) return Promise.resolve(false);
+      return new Promise(resolve => {
+        const callbackName = `turnSave_${Date.now()}_${Math.round(Math.random() * 100000)}`;
+        const script = document.createElement("script");
+        const timer = window.setTimeout(() => {
+          cleanup();
+          resolve(false);
+        }, 12000);
+
+        function cleanup() {
+          window.clearTimeout(timer);
+          script.remove();
+          delete window[callbackName];
+        }
+
+        window[callbackName] = payload => {
+          cleanup();
+          resolve(Boolean(payload && payload.ok));
+        };
+
+        script.onerror = () => {
+          cleanup();
+          resolve(false);
+        };
+
+        const params = new URLSearchParams({
+          action: "append",
+          callback: callbackName,
+          payload: JSON.stringify(turn)
+        });
+        script.src = `${GOOGLE_APPS_SCRIPT_URL}?${params.toString()}`;
+        document.head.appendChild(script);
+      });
+    }
+
+    function matchingLawyerTurns(turn) {
+      const key = normalize(turn.name);
+      return turns.filter(existing => normalize(existing.name) === key);
+    }
+
+    function duplicateWarnings(turn) {
+      const existingTurns = matchingLawyerTurns(turn);
+      const turnMonth = String(turn.date).slice(0, 7);
+      const turnDate = parseDate(turn.date);
+      const twelveMonthsAgo = new Date(turnDate.getFullYear(), turnDate.getMonth() - 12, 1);
+      const warnings = [];
+
+      if (existingTurns.some(item => String(item.date).slice(0, 7) === turnMonth)) {
+        warnings.push("Este abogado(a) ya tiene un turno registrado en el mismo mes.");
+      }
+      if (existingTurns.some(item => item.subject === turn.subject)) {
+        warnings.push("Este abogado(a) ya registra turnos en la misma materia.");
+      }
+      if (existingTurns.some(item => item.court === turn.court)) {
+        warnings.push("Este abogado(a) ya registra turnos en el mismo tribunal.");
+      }
+      if (existingTurns.some(item => parseDate(item.date) >= twelveMonthsAgo && parseDate(item.date) <= turnDate)) {
+        warnings.push("Este abogado(a) tuvo turno dentro de los últimos 12 meses.");
+      }
+
+      return [...new Set(warnings)];
+    }
+
+    function openConfirmModal(turn) {
+      const warnings = duplicateWarnings(turn);
+      els.confirmBody.innerHTML = `
+        <div class="summary-grid">
+          <div class="info-box"><span>Abogado(a)</span><strong>${escapeHtml(turn.name)}</strong></div>
+          <div class="info-box"><span>Materia</span><strong>${escapeHtml(turn.subject)}</strong></div>
+          <div class="info-box"><span>Tribunal</span><strong>${escapeHtml(turn.court)}</strong></div>
+          <div class="info-box"><span>Mes</span><strong>${escapeHtml(turn.month)} ${escapeHtml(turn.year)}</strong></div>
+          <div class="info-box"><span>Estado</span><strong>${escapeHtml(turn.status)}</strong></div>
+          <div class="info-box"><span>Contacto</span><strong>${displayValue(turn.email || turn.phone)}</strong></div>
+        </div>
+        ${warnings.length ? `
+          <div class="info-box">
+            <span>Advertencias de duplicado</span>
+            <ul class="warning-list">${warnings.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
+          </div>
+        ` : `<div class="info-box"><span>Validación</span><strong>Sin duplicados relevantes detectados.</strong></div>`}
+      `;
+      els.confirmModal.classList.add("visible");
+    }
+
+    function closeConfirmModal() {
+      els.confirmModal.classList.remove("visible");
+    }
+
+    async function savePendingTurn() {
+      if (!pendingTurn) return;
+      const saveButton = document.querySelector("#saveLawyerButton");
+      const turn = pendingTurn;
+      pendingTurn = null;
+      closeConfirmModal();
+      showToast("Guardando abogado(a) y turno...");
+      saveButton.disabled = true;
+      saveButton.textContent = "Guardando...";
+      turns.push(turn);
+      const savedToSheet = await saveTurnToGoogleSheet(turn).catch(() => false);
+      document.querySelector("#turnForm").reset();
+      saveButton.disabled = false;
+      saveButton.textContent = "Guardar abogado(a)";
+
+      const timestamp = new Date().toLocaleString("es-CL");
+      els.lastSaveStatus.classList.add("visible");
+      els.lastSaveStatus.innerHTML = `<strong>Último turno ingresado:</strong> ${escapeHtml(turn.name)} · ${escapeHtml(turn.subject)} · ${escapeHtml(turn.court)} · ${escapeHtml(turn.month)} ${escapeHtml(turn.year)}. Estado de sincronización: ${savedToSheet ? "enviado a Google Sheets" : "solo local"} · ${timestamp}.`;
+
+      if (savedToSheet) {
+        showToast("Turno enviado a Google Sheets. Actualizando datos...");
+        await syncFromSheet().catch(() => renderAll());
+        showToast("Turno guardado y datos actualizados.");
+      } else {
+        renderAll();
+        showToast("Turno guardado solo en esta página; falta configurar Google Apps Script para escribir en Sheets.");
+      }
+    }
+
+    document.querySelector("#turnForm").addEventListener("submit", async event => {
+      event.preventDefault();
+      const monthValue = document.querySelector("#turnDate").value;
+      const lawyerName = document.querySelector("#lawyerName").value.trim();
+      const courtValue = document.querySelector("#courtInput").value.trim();
+      const subjectValue = document.querySelector("#subjectInput").value.trim();
+
+      if (!lawyerName) {
+        showToast("Ingresa o selecciona un abogado(a) antes de guardar.");
+        document.querySelector("#lawyerName").focus();
+        return;
+      }
+      if (!monthValue) {
+        showToast("Selecciona el mes del turno antes de guardar.");
+        document.querySelector("#turnDate").focus();
+        return;
+      }
+      if (!courtValue || !subjectValue) {
+        showToast("Completa tribunal y materia antes de guardar.");
+        (!courtValue ? document.querySelector("#courtInput") : document.querySelector("#subjectInput")).focus();
+        return;
+      }
+
+      showToast("Revisa el resumen antes de guardar.");
+      const saveButton = document.querySelector("#saveLawyerButton");
+      saveButton.disabled = true;
+      saveButton.textContent = "Revisando...";
+      const newTurn = {
+        name: lawyerName,
+        source: "Formulario web abogados de turno",
+        id: "",
+        address: document.querySelector("#lawyerAddress").value.trim(),
+        phone: document.querySelector("#lawyerPhone").value.trim(),
+        email: document.querySelector("#lawyerEmail").value.trim(),
+        court: courtValue,
+        subject: subjectValue,
+        date: `${monthValue}-01`,
+        year: monthValue.slice(0, 4),
+        month: monthFmt.format(parseDate(`${monthValue}-01`)).split(" de ")[0],
+        status: document.querySelector("#statusInput").value,
+        active: "Sí",
+        notes: document.querySelector("#notesInput").value.trim()
+      };
+      pendingTurn = newTurn;
+      saveButton.disabled = false;
+      saveButton.textContent = "Guardar abogado(a)";
+      openConfirmModal(newTurn);
+    });
+
+    els.lawyerResults.addEventListener("click", event => {
+      const button = event.target.closest(".lawyer-option");
+      if (button) selectLawyer(button.dataset.key);
+    });
+
+    [els.searchName, els.searchSubject, els.searchCourt].forEach(control => {
+      control.addEventListener("input", renderLawyerResults);
+      control.addEventListener("change", renderLawyerResults);
+    });
+
+    [els.suggestCourt, els.suggestSubject].forEach(control => control.addEventListener("change", renderCandidates));
+    els.monthRangeButtons.addEventListener("click", event => {
+      const button = event.target.closest("button[data-min-months]");
+      if (!button) return;
+      rankingMinMonths = Number(button.dataset.minMonths);
+      els.monthRangeButtons.querySelectorAll("button").forEach(item => item.classList.toggle("active", item === button));
+      renderCandidates();
+    });
+    els.candidateList.addEventListener("click", event => {
+      const checkbox = event.target.closest(".proposal-check");
+      if (checkbox) {
+        if (checkbox.checked) selectedProposalKeys.add(checkbox.dataset.key);
+        else selectedProposalKeys.delete(checkbox.dataset.key);
+        renderProposal();
+        return;
+      }
+      const button = event.target.closest(".use-candidate");
+      if (button) useCandidate(button.dataset.key);
+    });
+    els.exportProposalButton.addEventListener("click", exportProposalPdf);
+    document.querySelector("#suggestButton").addEventListener("click", renderCandidates);
+    document.querySelector("#refreshButton").addEventListener("click", syncFromSheet);
+    document.querySelector("#syncButton").addEventListener("click", syncFromSheet);
+    document.querySelector("#goNewTurn").addEventListener("click", () => showView("newTurn"));
+    els.cancelConfirm.addEventListener("click", () => {
+      pendingTurn = null;
+      closeConfirmModal();
+      showToast("Registro cancelado.");
+    });
+    els.acceptConfirm.addEventListener("click", savePendingTurn);
+    els.confirmModal.addEventListener("click", event => {
+      if (event.target === els.confirmModal) {
+        pendingTurn = null;
+        closeConfirmModal();
+      }
+    });
+    els.backTop.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
+    window.addEventListener("scroll", () => {
+      els.backTop.classList.toggle("visible", window.scrollY > 420);
+    });
+    document.querySelectorAll("nav button").forEach(button => {
+      button.addEventListener("click", () => showView(button.dataset.view));
+    });
+
+    renderAll();
+    renderLawyerDetail(null);
+    syncFromSheet().catch(() => showToast("No se pudo sincronizar la planilla; se muestran datos de ejemplo."));
+  </script>
+</body>
+</html>
