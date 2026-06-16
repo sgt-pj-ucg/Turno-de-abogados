@@ -51,23 +51,23 @@
     .brand {
       display: grid;
       gap: 8px;
+      justify-items: center;
+      text-align: center;
       padding-bottom: 22px;
       border-bottom: 1px solid rgba(255,255,255,.16);
     }
 
     .brand-main {
-      display: flex;
-      gap: 12px;
-      align-items: center;
-      justify-content: center;
+      display: grid;
+      gap: 8px;
+      justify-items: center;
     }
 
     .brand-logo {
-      width: 62px;
-      max-width: 62px;
+      width: 104px;
+      max-width: 104px;
       height: auto;
       display: block;
-      flex: 0 0 auto;
     }
 
     .seal {
@@ -833,8 +833,14 @@
                 <select id="searchSubject"><option value="">Todas</option></select>
               </div>
               <div class="field">
-                <label for="searchCourt">Tribunal</label>
-                <select id="searchCourt"><option value="">Todos</option></select>
+                <label for="searchMonths">Meses sin turno</label>
+                <select id="searchMonths">
+                  <option value="0">Todos</option>
+                  <option value="6">6+ meses</option>
+                  <option value="12">12+ meses</option>
+                  <option value="24">24+ meses</option>
+                  <option value="36">36+ meses</option>
+                </select>
               </div>
             </div>
             <div class="lawyer-results" id="lawyerResults"></div>
@@ -1003,7 +1009,7 @@
     const els = {
       searchName: document.querySelector("#searchName"),
       searchSubject: document.querySelector("#searchSubject"),
-      searchCourt: document.querySelector("#searchCourt"),
+      searchMonths: document.querySelector("#searchMonths"),
       lawyerResults: document.querySelector("#lawyerResults"),
       lawyerDetail: document.querySelector("#lawyerDetail"),
       lawyerCount: document.querySelector("#lawyerCount"),
@@ -1134,7 +1140,6 @@
       const courts = uniqueValues(turns, "court");
       fillSelect(els.searchSubject, subjects);
       fillSelect(els.suggestSubject, subjects);
-      fillSelect(els.searchCourt, courts);
       fillSelect(els.suggestCourt, courts);
       fillDatalist(document.querySelector("#courtOptions"), courts);
       fillDatalist(document.querySelector("#subjectOptions"), subjects);
@@ -1143,12 +1148,12 @@
     function filteredProfiles() {
       const text = normalize(els.searchName.value);
       const subject = els.searchSubject.value;
-      const court = els.searchCourt.value;
+      const minMonths = Number(els.searchMonths.value || 0);
       return groupLawyers().filter(profile => {
         const matchesText = !text || normalize(`${profile.name} ${profile.email} ${profile.phone}`).includes(text);
         const matchesSubject = !subject || profile.subjects.includes(subject);
-        const matchesCourt = !court || profile.courts.includes(court);
-        return matchesText && matchesSubject && matchesCourt;
+        const matchesMonths = profile.monthsWithoutTurn >= minMonths;
+        return matchesText && matchesSubject && matchesMonths;
       });
     }
 
@@ -1811,7 +1816,7 @@
       if (button) selectLawyer(button.dataset.key);
     });
 
-    [els.searchName, els.searchSubject, els.searchCourt].forEach(control => {
+    [els.searchName, els.searchSubject, els.searchMonths].forEach(control => {
       control.addEventListener("input", renderLawyerResults);
       control.addEventListener("change", renderLawyerResults);
     });
