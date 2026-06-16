@@ -790,6 +790,7 @@
       <nav aria-label="Secciones">
         <button class="active" type="button" data-view="search">Buscar abogado</button>
         <button type="button" data-view="newTurn">Nuevo turno</button>
+        <button type="button" data-view="alerts">Alertas de información</button>
       </nav>
       <div class="sync-card">
         <p>Datos conectados a la planilla Google Sheets entregada. La sincronización actualiza búsqueda, ficha y ranking.</p>
@@ -859,14 +860,6 @@
 
       <section class="view" id="newTurnView">
         <div class="new-turn-grid">
-          <section class="panel">
-            <div class="panel-header">
-              <h3>Panel de alertas</h3>
-              <span class="badge red">Calidad de datos</span>
-            </div>
-            <div class="alert-grid" id="alertPanel"></div>
-          </section>
-
           <section class="panel">
             <div class="panel-header">
               <h3>Ranking para próximo turno</h3>
@@ -974,6 +967,16 @@
           </section>
         </div>
       </section>
+
+      <section class="view" id="alertsView">
+        <section class="panel">
+          <div class="panel-header">
+            <h3>Panel de alertas de información</h3>
+            <span class="badge red">Calidad de datos</span>
+          </div>
+          <div class="alert-grid" id="alertPanel"></div>
+        </section>
+      </section>
     </main>
   </div>
 
@@ -994,7 +997,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwUyTXbpMPo3FOL8dHfq-gZSRavhVs6gnDdIFrA0WeXtKFbzQrPxgUF4wkxJ2XmSDp4/exec";
-    const APP_VERSION = "2026-06-16-sync-planilla-nueva-v2";
+    const APP_VERSION = "2026-06-16-tribunales-alertas-v3";
 
     const seedTurns = [
       { name: "Carolina Reyes M.", id: "12.345.678-9", address: "Monjitas 527, Santiago", phone: "+56 9 1111 2222", email: "carolina@example.cl", court: "1° Juzgado Civil", subject: "Civil", date: "2026-01-01", year: "2026", month: "Enero", status: "Cumplido", notes: "Dato de ejemplo" },
@@ -1066,6 +1069,28 @@
 
     function displayValue(value) {
       return value && String(value).trim() ? escapeHtml(value) : "Sin información";
+    }
+
+    function canonicalCourtName(value) {
+      const raw = String(value || "").replace(/\s+/g, " ").trim();
+      const key = normalize(raw);
+      if (!raw) return "";
+      if (key.includes("causas criminales") || key.includes("causa criminal")) {
+        return "Causas criminales (antiguo)";
+      }
+      if (key.includes("segunda instancia") && key.includes("fiscalia militar")) {
+        return "Segunda instancia y Fiscalía Militar";
+      }
+      return raw;
+    }
+
+    function canonicalSubjectName(value) {
+      const raw = String(value || "").replace(/\s+/g, " ").trim();
+      const key = normalize(raw);
+      if (!raw) return "";
+      if (key.includes("criminal antiguo")) return "Criminal antiguo";
+      if (key.includes("segunda instancia") && key.includes("fiscalia")) return "Segunda instancia y Fiscalía Militar";
+      return raw;
     }
 
     function hasData(value) {
@@ -1486,10 +1511,17 @@
       document.querySelector(`#${view}View`).classList.add("active");
       document.querySelectorAll("nav button").forEach(button => button.classList.toggle("active", button.dataset.view === view));
       const isNewTurn = view === "newTurn";
-      document.querySelector("#pageTitle").textContent = isNewTurn ? "Generar y registrar nuevo turno" : "Consulta institucional de abogados";
+      const isAlerts = view === "alerts";
+      document.querySelector("#pageTitle").textContent = isNewTurn
+        ? "Generar y registrar nuevo turno"
+        : isAlerts
+          ? "Alertas de información"
+          : "Consulta institucional de abogados";
       document.querySelector("#pageSubtitle").textContent = isNewTurn
         ? "Revisa el ranking por meses sin turno, especialidades históricas y registra una nueva asignación."
-        : "Busca libremente por nombre, revisa datos de contacto y consulta todos los turnos realizados por año, mes, tribunal y materia.";
+        : isAlerts
+          ? "Revisa datos faltantes, abogados excluidos del ranking y calidad de contacto."
+          : "Busca libremente por nombre, revisa datos de contacto y consulta todos los turnos realizados por año, mes, tribunal y materia.";
     }
 
     function showToast(message) {
@@ -1574,8 +1606,8 @@
           address: pick("domicilio"),
           phone: pick("fono", "telefono", "teléfono"),
           email: pick("email", "correo"),
-          court: pick("tribunal", "unidad"),
-          subject: pick("materia"),
+          court: canonicalCourtName(pick("tribunal", "unidad")),
+          subject: canonicalSubjectName(pick("materia")),
           date,
           year: year || date.slice(0, 4),
           month: month || monthFmt.format(parseDate(date)),
@@ -1673,6 +1705,12 @@
 
     async function loadSheetRows() {
       try {
+        return await loadSheetViaAppsScript();
+      } catch (error) {
+        console.warn("No se pudo leer desde Apps Script; se probará CSV.", error);
+      }
+
+      try {
         const response = await fetch(`${SHEET_CSV_URL}&cacheBust=${Date.now()}`, { cache: "no-store" });
         if (!response.ok) throw new Error(`HTTP ${response.status}`);
         const csv = await response.text();
@@ -1681,12 +1719,6 @@
         return rows;
       } catch (error) {
         console.warn("No se pudo leer CSV; se probará Apps Script.", error);
-      }
-
-      try {
-        return await loadSheetViaAppsScript();
-      } catch (error) {
-        console.warn("No se pudo leer desde Apps Script; se usará gviz de respaldo.", error);
       }
 
       return loadSheetViaGviz();
@@ -1856,8 +1888,8 @@
         address: document.querySelector("#lawyerAddress").value.trim(),
         phone: document.querySelector("#lawyerPhone").value.trim(),
         email: document.querySelector("#lawyerEmail").value.trim(),
-        court: courtValue,
-        subject: subjectValue,
+        court: canonicalCourtName(courtValue),
+        subject: canonicalSubjectName(subjectValue),
         date: `${monthValue}-01`,
         year: monthValue.slice(0, 4),
         month: monthFmt.format(parseDate(`${monthValue}-01`)).split(" de ")[0],
