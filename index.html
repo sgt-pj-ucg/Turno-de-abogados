@@ -568,6 +568,45 @@
       flex-wrap: wrap;
     }
 
+    .data-warning {
+      border: 1px solid #f2d7a0;
+      border-radius: 8px;
+      padding: 12px;
+      background: #fff8e8;
+      color: #7a581a;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 12px;
+      flex-wrap: wrap;
+      font-size: 13px;
+      line-height: 1.4;
+    }
+
+    .sort-button {
+      border: 0;
+      background: transparent;
+      color: inherit;
+      padding: 0;
+      cursor: pointer;
+      font: inherit;
+      text-transform: inherit;
+      letter-spacing: inherit;
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-weight: 800;
+    }
+
+    .sort-button::after {
+      content: "↕";
+      font-size: 11px;
+      color: var(--muted);
+    }
+
+    .sort-button.active.asc::after { content: "↑"; color: var(--blue); }
+    .sort-button.active.desc::after { content: "↓"; color: var(--blue); }
+
     .chips {
       display: flex;
       flex-wrap: wrap;
@@ -1021,6 +1060,14 @@
                   <option value="36">36+ meses</option>
                 </select>
               </div>
+              <div class="field">
+                <label for="searchActive">Habilitación</label>
+                <select id="searchActive">
+                  <option value="all">Todos</option>
+                  <option value="yes">Habilitados</option>
+                  <option value="no">No habilitados</option>
+                </select>
+              </div>
             </div>
             <div class="lawyer-results" id="lawyerResults"></div>
           </section>
@@ -1186,7 +1233,7 @@
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby4yTMY11uKh55QfAX0d_EiniX7trixkS6LQNStv-H7rKocbQe3lDPFDYpQZax8KgT7/exec";
     const APP_VERSION = "1";
-    const REQUIRED_SCRIPT_VERSION = "2026-06-17-strict-name-match-v5";
+    const REQUIRED_SCRIPT_VERSION = "2026-06-17-audit-log-v6";
 
     const seedTurns = [
       { name: "Carolina Reyes M.", id: "12.345.678-9", address: "Monjitas 527, Santiago", phone: "+56 9 1111 2222", email: "carolina@example.cl", court: "1° Juzgado Civil", subject: "Civil", date: "2026-01-01", year: "2026", month: "Enero", status: "Cumplido", notes: "Dato de ejemplo" },
@@ -1201,12 +1248,14 @@
     let selectedAlertType = "missingEmail";
     let scriptVersionOk = null;
     let publishedScriptVersion = "";
+    let historySort = { key: "date", direction: "desc" };
     const selectedProposalKeys = new Set();
 
     const els = {
       searchName: document.querySelector("#searchName"),
       searchSubject: document.querySelector("#searchSubject"),
       searchMonths: document.querySelector("#searchMonths"),
+      searchActive: document.querySelector("#searchActive"),
       lawyerResults: document.querySelector("#lawyerResults"),
       lawyerDetail: document.querySelector("#lawyerDetail"),
       lawyerCount: document.querySelector("#lawyerCount"),
@@ -1267,6 +1316,79 @@
 
     function displayValue(value) {
       return value && String(value).trim() ? escapeHtml(value) : "Sin información";
+    }
+
+    function currentActor() {
+      return "Aplicacion web";
+    }
+
+    function contactIssues(profile) {
+      const issues = [];
+      if (!hasData(profile.email)) issues.push("correo");
+      if (!hasData(profile.phone)) issues.push("teléfono");
+      if (!hasData(profile.address)) issues.push("domicilio");
+      return issues;
+    }
+
+    function validateContact(contact) {
+      const errors = [];
+      const warnings = [];
+      const email = String(contact.email || "").trim();
+      const phone = String(contact.phone || "").trim();
+      const address = String(contact.address || "").trim();
+      const phoneDigits = phone.replace(/\D/g, "");
+
+      if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
+        errors.push("El correo no parece válido.");
+      }
+      if (phone && phoneDigits.length < 7) {
+        errors.push("El teléfono debe tener al menos 7 dígitos.");
+      }
+      if (!email) warnings.push("El correo quedará vacío.");
+      if (!phone) warnings.push("El teléfono quedará vacío.");
+      if (!address || !hasData(address)) warnings.push("El domicilio quedará sin información.");
+
+      return { errors, warnings };
+    }
+
+    function confirmContactValidation(contact) {
+      const validation = validateContact(contact);
+      if (validation.errors.length) {
+        showToast(validation.errors.join(" "));
+        return false;
+      }
+      if (validation.warnings.length) {
+        return window.confirm(`Advertencias:\n- ${validation.warnings.join("\n- ")}\n\n¿Guardar de todos modos?`);
+      }
+      return true;
+    }
+
+    function promptDisableReason(profile) {
+      const reason = window.prompt(
+        `Motivo para deshabilitar a ${profile.name}:\n\n` +
+        "Ejemplos: fuera de región, no acepta turnos, datos no vigentes, suspendido/no disponible."
+      );
+      if (reason === null) return "";
+      return reason.trim();
+    }
+
+    function sortedHistory(turnsList) {
+      const items = [...turnsList];
+      const direction = historySort.direction === "asc" ? 1 : -1;
+      return items.sort((a, b) => {
+        if (historySort.key === "year" || historySort.key === "month" || historySort.key === "date") {
+          return (parseDate(a.date) - parseDate(b.date)) * direction;
+        }
+        const left = String(a[historySort.key] || "");
+        const right = String(b[historySort.key] || "");
+        return left.localeCompare(right, "es") * direction;
+      });
+    }
+
+    function sortButton(key, label) {
+      const active = historySort.key === key;
+      const directionClass = active ? historySort.direction : "";
+      return `<button class="sort-button ${active ? "active" : ""} ${directionClass}" type="button" data-sort-history="${key}">${label}</button>`;
     }
 
     function canonicalCourtName(value) {
@@ -1337,6 +1459,7 @@
         profile.courts = uniqueValues(profile.turns, "court");
         profile.lastTurn = profile.turns[0];
         profile.active = isActiveValue(profile.lastTurn?.active);
+        profile.disableReason = profile.lastTurn?.disableReason || profile.turns.find(turn => hasData(turn.disableReason))?.disableReason || "";
         profile.monthsWithoutTurn = monthsSince(profile.lastTurn?.date);
         profile.nameSearchText = normalize([
           profile.name,
@@ -1389,11 +1512,15 @@
       const text = normalize(searchInput ? searchInput.value : "");
       const subject = els.searchSubject.value;
       const minMonths = Number(els.searchMonths.value || 0);
+      const activeFilter = els.searchActive.value;
       return groupLawyers().filter(profile => {
         const matchesText = !text || profile.nameSearchText.includes(text);
         const matchesSubject = text ? true : (!subject || profile.subjects.includes(subject));
         const matchesMonths = text ? true : profile.monthsWithoutTurn >= minMonths;
-        return matchesText && matchesSubject && matchesMonths;
+        const matchesActive = activeFilter === "all"
+          || (activeFilter === "yes" && profile.active)
+          || (activeFilter === "no" && !profile.active);
+        return matchesText && matchesSubject && matchesMonths && matchesActive;
       });
     }
 
@@ -1437,6 +1564,8 @@
       els.selectedBadge.textContent = `${profile.turns.length} turnos`;
       els.lawyerDetail.className = "profile";
       const specialties = topSubjects(profile);
+      const missingIssues = contactIssues(profile);
+      const historyTurns = sortedHistory(profile.turns);
       els.lawyerDetail.innerHTML = `
         <div class="profile-head">
           <div>
@@ -1453,12 +1582,19 @@
               </div>
             </div>
             <small>Este estado controla si aparece o no en el ranking de nuevo turno.</small>
+            ${!profile.active && profile.disableReason ? `<small><strong>Motivo:</strong> ${escapeHtml(profile.disableReason)}</small>` : ""}
           </div>
         </div>
         <div class="contact-toolbar">
           <h4>Datos de contacto</h4>
           <button class="btn compact" type="button" data-edit-contact="${escapeHtml(profile.key)}">Editar contacto</button>
         </div>
+        ${missingIssues.length ? `
+          <div class="data-warning">
+            <strong>Datos incompletos: ${escapeHtml(missingIssues.join(", "))}.</strong>
+            <button class="btn compact" type="button" data-edit-contact="${escapeHtml(profile.key)}">Completar datos</button>
+          </div>
+        ` : ""}
         <div class="contact-grid">
           <div class="info-box"><span>Dirección</span><strong>${displayValue(profile.address)}</strong></div>
           <div class="info-box"><span>Teléfono</span><strong>${displayValue(profile.phone)}</strong></div>
@@ -1493,16 +1629,16 @@
           <table>
             <thead>
               <tr>
-                <th>Año</th>
-                <th>Mes</th>
-                <th>Tribunal</th>
-                <th>Materia</th>
-                <th>Estado</th>
+                <th>${sortButton("year", "Año")}</th>
+                <th>${sortButton("month", "Mes")}</th>
+                <th>${sortButton("court", "Tribunal")}</th>
+                <th>${sortButton("subject", "Materia")}</th>
+                <th>${sortButton("status", "Estado")}</th>
                 <th>Observaciones</th>
               </tr>
             </thead>
             <tbody>
-              ${profile.turns.map(turn => `
+              ${historyTurns.map(turn => `
                 <tr>
                   <td>${escapeHtml(turn.year)}</td>
                   <td>${escapeHtml(turn.month)}</td>
@@ -1616,6 +1752,7 @@
               </div>
               <span class="badge red">No habilitado</span>
             </div>
+            ${profile.disableReason ? `<p class="muted"><strong>Motivo:</strong> ${escapeHtml(profile.disableReason)}</p>` : ""}
             <div class="alert-edit-grid">
               <div class="info-box"><span>Correo</span><strong>${displayValue(profile.email)}</strong></div>
               <div class="info-box"><span>Teléfono</span><strong>${displayValue(profile.phone)}</strong></div>
@@ -1985,6 +2122,7 @@
           month: month || monthFmt.format(parseDate(date)),
           status: pick("estado registro", "estado") || "Programado",
           active: pick("habilitado turno", "activo para procesamiento", "activo") || "Sí",
+          disableReason: pick("motivo inhabilitacion", "motivo inhabilitación", "motivo no habilitado"),
           notes: pick("observaciones", "documento fuente")
         };
       }).filter(turn => turn.name && turn.date);
@@ -2196,7 +2334,7 @@
       });
     }
 
-    function updateEnabledInGoogleSheet(profile, enabledValue) {
+    function updateEnabledInGoogleSheet(profile, enabledValue, reason = "") {
       if (!GOOGLE_APPS_SCRIPT_URL) return Promise.resolve({ ok: false, message: "No hay Apps Script configurado." });
       return new Promise(resolve => {
         const callbackName = `enabledSave_${Date.now()}_${Math.round(Math.random() * 100000)}`;
@@ -2236,7 +2374,9 @@
             key: profile.key,
             name: profile.name,
             phone: profile.phone,
-            email: profile.email
+            email: profile.email,
+            reason,
+            actor: currentActor()
           })
         });
         script.src = `${GOOGLE_APPS_SCRIPT_URL}?${params.toString()}`;
@@ -2286,7 +2426,8 @@
             currentEmail: profile.email,
             phone: contact.phone,
             email: contact.email,
-            address: contact.address
+            address: contact.address,
+            actor: currentActor()
           })
         });
         script.src = `${GOOGLE_APPS_SCRIPT_URL}?${params.toString()}`;
@@ -2308,6 +2449,7 @@
         showToast("Completa al menos un dato de contacto antes de guardar.");
         return;
       }
+      if (!confirmContactValidation(contact)) return;
 
       const button = card.querySelector(".save-contact");
       if (button) {
@@ -2352,6 +2494,7 @@
         showToast("Completa al menos un dato antes de guardar.");
         return;
       }
+      if (!confirmContactValidation(contact)) return;
 
       const button = panel.querySelector("[data-save-profile-contact]");
       if (button) {
@@ -2388,20 +2531,26 @@
       if (!canWriteSafely()) return;
       const currentValue = profile.active ? "Sí" : "No";
       if (currentValue === enabledValue) return;
+      const disableReason = enabledValue === "No" ? promptDisableReason(profile) : "";
+      if (enabledValue === "No" && !disableReason) {
+        showToast("Para deshabilitar, debes indicar un motivo.");
+        return;
+      }
       const confirmed = window.confirm(
         `¿Cambiar habilitación de ${profile.name} a "${enabledValue}"?\n\n` +
+        (disableReason ? `Motivo: ${disableReason}\n\n` : "") +
         "Esto actualizará la columna Habilitado Turno en Google Sheets y afectará el ranking."
       );
       if (!confirmed) return;
 
       els.lawyerDetail.querySelectorAll("[data-enabled-value]").forEach(button => button.disabled = true);
-      turns = turns.map(turn => personKey(turn) === key ? { ...turn, active: enabledValue } : turn);
+      turns = turns.map(turn => personKey(turn) === key ? { ...turn, active: enabledValue, disableReason: enabledValue === "No" ? disableReason : "" } : turn);
       renderAll();
       renderLawyerDetail(groupLawyers().find(item => item.key === key));
       showToast("Cambio aplicado en pantalla. Sincronizando con Google Sheets...");
-      const result = await updateEnabledInGoogleSheet(profile, enabledValue);
+      const result = await updateEnabledInGoogleSheet(profile, enabledValue, disableReason);
       if (!result.ok || !result.updated) {
-        turns = turns.map(turn => personKey(turn) === key ? { ...turn, active: currentValue } : turn);
+        turns = turns.map(turn => personKey(turn) === key ? { ...turn, active: currentValue, disableReason: profile.disableReason || "" } : turn);
         renderAll();
         renderLawyerDetail(groupLawyers().find(item => item.key === key));
         showToast(result.message || "No se pudo actualizar la planilla. Revisa que el Apps Script esté actualizado y desplegado.");
@@ -2550,6 +2699,21 @@
     });
 
     els.lawyerDetail.addEventListener("click", event => {
+      const sortHistoryButton = event.target.closest("[data-sort-history]");
+      if (sortHistoryButton) {
+        const key = sortHistoryButton.dataset.sortHistory;
+        if (historySort.key === key) {
+          historySort.direction = historySort.direction === "asc" ? "desc" : "asc";
+        } else {
+          historySort = {
+            key,
+            direction: ["year", "month", "date"].includes(key) ? "desc" : "asc"
+          };
+        }
+        renderLawyerDetail(groupLawyers().find(item => item.key === selectedLawyerKey));
+        return;
+      }
+
       const editButton = event.target.closest("[data-edit-contact]");
       if (editButton) {
         const panel = els.lawyerDetail.querySelector(`[data-contact-editor="${CSS.escape(editButton.dataset.editContact)}"]`);
@@ -2601,7 +2765,7 @@
       els.searchName.addEventListener(eventName, () => window.setTimeout(handleSearchChange, 0));
     });
 
-    [els.searchSubject, els.searchMonths].forEach(control => {
+    [els.searchSubject, els.searchMonths, els.searchActive].forEach(control => {
       control.addEventListener("input", handleSearchChange);
       control.addEventListener("change", handleSearchChange);
     });
