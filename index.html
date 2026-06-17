@@ -1135,8 +1135,8 @@
 
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
-    const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyS9N9xSXpJrOQSpC7eD47i7Af4tLZ3Aq1eihpAqzx0K3SrbrOU6CC6_lAY5E-SbZ4X/exec";
-    const APP_VERSION = "2026-06-17-alertas-editables-v10";
+    const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw2v2jcG_Z-5jKB1gFd2fXz9FUvLXDn0gQF1j22QpHWzOn5tHKY0xeUEp8Y_Q4tWxw6/exec";
+    const APP_VERSION = "2026-06-17-alertas-editables-v11";
 
     const seedTurns = [
       { name: "Carolina Reyes M.", id: "12.345.678-9", address: "Monjitas 527, Santiago", phone: "+56 9 1111 2222", email: "carolina@example.cl", court: "1° Juzgado Civil", subject: "Civil", date: "2026-01-01", year: "2026", month: "Enero", status: "Cumplido", notes: "Dato de ejemplo" },
@@ -1494,7 +1494,7 @@
         ["inactive", "Excluidos del ranking"]
       ];
       els.alertPanel.innerHTML = boxes.map(([type, label]) => `
-        <button class="alert-box ${selectedAlertType === type ? "active" : ""}" type="button" data-alert-type="${type}">
+        <button class="alert-box ${selectedAlertType === type ? "active" : ""}" type="button" data-alert-type="${type}" onclick="window.turnosSelectAlert && window.turnosSelectAlert('${type}')">
           <span>${label}</span>
           <strong>${groups[type].length}</strong>
         </button>
@@ -1516,6 +1516,13 @@
         ${profiles.length ? profiles.map(profile => renderAlertCard(profile)).join("") : `<div class="empty">${escapeHtml(config.empty || "Sin registros pendientes.")}</div>`}
       `;
     }
+
+    function selectAlertType(type) {
+      selectedAlertType = type;
+      renderAlerts();
+      els.alertDetail.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+    window.turnosSelectAlert = selectAlertType;
 
     function renderAlertCard(profile) {
       const lastTurn = profile.lastTurn;
@@ -2376,8 +2383,8 @@
     els.alertPanel.addEventListener("click", event => {
       const button = event.target.closest("[data-alert-type]");
       if (!button) return;
-      selectedAlertType = button.dataset.alertType;
-      renderAlerts();
+      if (selectedAlertType === button.dataset.alertType) return;
+      selectAlertType(button.dataset.alertType);
     });
 
     els.alertDetail.addEventListener("click", event => {
