@@ -1071,7 +1071,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzDt1AG8DupBQRX5JdwJYkI-eZ3Nn1SdWziM0b6evwrn7ngwkyvdqsJ0N3zMkWPqMI/exec";
-    const APP_VERSION = "2026-06-16-habilitado-switch-v6";
+    const APP_VERSION = "2026-06-16-busqueda-directa-v7";
 
     const seedTurns = [
       { name: "Carolina Reyes M.", id: "12.345.678-9", address: "Monjitas 527, Santiago", phone: "+56 9 1111 2222", email: "carolina@example.cl", court: "1° Juzgado Civil", subject: "Civil", date: "2026-01-01", year: "2026", month: "Enero", status: "Cumplido", notes: "Dato de ejemplo" },
@@ -1270,7 +1270,8 @@
     }
 
     function filteredProfiles() {
-      const text = normalize(els.searchName.value);
+      const searchInput = document.querySelector("#searchName");
+      const text = normalize(searchInput ? searchInput.value : "");
       const subject = els.searchSubject.value;
       const minMonths = Number(els.searchMonths.value || 0);
       return groupLawyers().filter(profile => {
@@ -1295,6 +1296,12 @@
           <span class="muted">${profile.turns.length} turno${profile.turns.length === 1 ? "" : "s"} · Último: ${profile.lastTurn ? escapeHtml(profile.lastTurn.month + " " + profile.lastTurn.year) : "Sin fecha"}</span>
         </button>
       `).join("");
+    }
+
+    function handleSearchChange() {
+      selectedLawyerKey = "";
+      renderLawyerResults();
+      renderLawyerDetail(null);
     }
 
     function selectLawyer(key) {
@@ -2102,9 +2109,13 @@
       setLawyerEnabled(button.dataset.key, button.dataset.enabledValue);
     });
 
-    [els.searchName, els.searchSubject, els.searchMonths].forEach(control => {
-      control.addEventListener("input", renderLawyerResults);
-      control.addEventListener("change", renderLawyerResults);
+    ["input", "keyup", "search", "paste", "compositionend"].forEach(eventName => {
+      els.searchName.addEventListener(eventName, () => window.setTimeout(handleSearchChange, 0));
+    });
+
+    [els.searchSubject, els.searchMonths].forEach(control => {
+      control.addEventListener("input", handleSearchChange);
+      control.addEventListener("change", handleSearchChange);
     });
 
     [els.suggestCourt, els.suggestSubject].forEach(control => control.addEventListener("change", renderCandidates));
