@@ -497,6 +497,27 @@
       flex-wrap: wrap;
     }
 
+    .contact-toolbar {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 12px;
+    }
+
+    .contact-toolbar h4 {
+      margin: 0;
+      color: var(--navy);
+      font-size: 14px;
+      letter-spacing: 0;
+    }
+
+    .btn.compact {
+      min-height: 34px;
+      padding: 6px 10px;
+      font-size: 13px;
+      font-weight: 700;
+    }
+
     .contact-grid, .summary-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -926,6 +947,7 @@
       .topbar, .profile-head { display: grid; }
       .actions { justify-content: stretch; }
       .actions .btn { flex: 1; }
+      .contact-toolbar { align-items: flex-start; flex-direction: column; }
       .metrics, .contact-grid, .summary-grid, .form-grid, .rank-controls, .alert-grid, .alert-edit-grid { grid-template-columns: 1fr; }
       .panel-header { align-items: flex-start; flex-direction: column; }
       .range-buttons button { min-width: 78px; }
@@ -1423,9 +1445,6 @@
           </div>
           <div class="status-control">
             <span class="badge green">Especialidad sugerida: ${escapeHtml(specialties[0] || "Sin historial")}</span>
-            <div class="profile-actions">
-              <button class="btn" type="button" data-edit-contact="${escapeHtml(profile.key)}">Editar datos</button>
-            </div>
             <div>
               <span class="badge ${profile.active ? "green" : "red"}">Habilitado para turno</span>
               <div class="enabled-toggle" aria-label="Cambiar habilitación para turno">
@@ -1435,6 +1454,10 @@
             </div>
             <small>Este estado controla si aparece o no en el ranking de nuevo turno.</small>
           </div>
+        </div>
+        <div class="contact-toolbar">
+          <h4>Datos de contacto</h4>
+          <button class="btn compact" type="button" data-edit-contact="${escapeHtml(profile.key)}">Editar contacto</button>
         </div>
         <div class="contact-grid">
           <div class="info-box"><span>Dirección</span><strong>${displayValue(profile.address)}</strong></div>
