@@ -2057,8 +2057,7 @@
           cleanup();
           publishedScriptVersion = payload?.version || "";
           scriptVersionOk = publishedScriptVersion === REQUIRED_SCRIPT_VERSION;
-          const suffix = scriptVersionOk ? "seguro" : `requiere publicar ${REQUIRED_SCRIPT_VERSION}`;
-          document.querySelector("#versionLabel").textContent = `Versión ${APP_VERSION} · Script ${publishedScriptVersion || "sin versión"} (${suffix})`;
+          document.querySelector("#versionLabel").textContent = `Versión ${APP_VERSION}`;
           if (!scriptVersionOk) {
             showToast(`Apps Script publicado: ${publishedScriptVersion || "sin versión"}. No se enviarán cambios de habilitación hasta publicar ${REQUIRED_SCRIPT_VERSION}.`);
           }
