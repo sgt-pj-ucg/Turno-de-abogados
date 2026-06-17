@@ -892,7 +892,7 @@
             <div class="filters">
               <div class="field">
                 <label for="searchName">Nombre del abogado</label>
-                <input id="searchName" type="search" placeholder="Ej. Paulo, Paula, Gallo, Bustos">
+                <input id="searchName" type="search" placeholder="Ej. Paulo, Paula, Gallo, Bustos" oninput="window.turnosApplySearch && window.turnosApplySearch()" onsearch="window.turnosApplySearch && window.turnosApplySearch()" onkeyup="window.turnosApplySearch && window.turnosApplySearch()">
               </div>
               <div class="field">
                 <label for="searchSubject">Materia</label>
@@ -1071,7 +1071,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzDt1AG8DupBQRX5JdwJYkI-eZ3Nn1SdWziM0b6evwrn7ngwkyvdqsJ0N3zMkWPqMI/exec";
-    const APP_VERSION = "2026-06-16-busqueda-directa-v7";
+    const APP_VERSION = "2026-06-16-busqueda-habilitado-v8";
 
     const seedTurns = [
       { name: "Carolina Reyes M.", id: "12.345.678-9", address: "Monjitas 527, Santiago", phone: "+56 9 1111 2222", email: "carolina@example.cl", court: "1° Juzgado Civil", subject: "Civil", date: "2026-01-01", year: "2026", month: "Enero", status: "Cumplido", notes: "Dato de ejemplo" },
@@ -1303,6 +1303,7 @@
       renderLawyerResults();
       renderLawyerDetail(null);
     }
+    window.turnosApplySearch = handleSearchChange;
 
     function selectLawyer(key) {
       selectedLawyerKey = key;
@@ -1951,17 +1952,19 @@
       if (!confirmed) return;
 
       els.lawyerDetail.querySelectorAll("[data-enabled-value]").forEach(button => button.disabled = true);
-      showToast("Actualizando habilitación en Google Sheets...");
-      const result = await updateEnabledInGoogleSheet(profile, enabledValue);
-      if (!result.ok || !result.updated) {
-        showToast(result.message || "No se pudo actualizar la planilla. Revisa que el Apps Script esté actualizado y desplegado.");
-        renderLawyerDetail(profile);
-        return;
-      }
-
       turns = turns.map(turn => personKey(turn) === key ? { ...turn, active: enabledValue } : turn);
       renderAll();
       renderLawyerDetail(groupLawyers().find(item => item.key === key));
+      showToast("Cambio aplicado en pantalla. Sincronizando con Google Sheets...");
+      const result = await updateEnabledInGoogleSheet(profile, enabledValue);
+      if (!result.ok || !result.updated) {
+        turns = turns.map(turn => personKey(turn) === key ? { ...turn, active: currentValue } : turn);
+        renderAll();
+        renderLawyerDetail(groupLawyers().find(item => item.key === key));
+        showToast(result.message || "No se pudo actualizar la planilla. Revisa que el Apps Script esté actualizado y desplegado.");
+        return;
+      }
+
       showToast(`Habilitación actualizada: ${profile.name} quedó en ${enabledValue}.`);
       syncFromSheet({ keepSelected: true }).catch(() => showToast("Cambio guardado; no se pudo refrescar la planilla en este momento."));
     }
