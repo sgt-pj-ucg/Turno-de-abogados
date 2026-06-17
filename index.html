@@ -1071,7 +1071,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzDt1AG8DupBQRX5JdwJYkI-eZ3Nn1SdWziM0b6evwrn7ngwkyvdqsJ0N3zMkWPqMI/exec";
-    const APP_VERSION = "2026-06-16-habilitado-switch-v5";
+    const APP_VERSION = "2026-06-16-habilitado-switch-v6";
 
     const seedTurns = [
       { name: "Carolina Reyes M.", id: "12.345.678-9", address: "Monjitas 527, Santiago", phone: "+56 9 1111 2222", email: "carolina@example.cl", court: "1° Juzgado Civil", subject: "Civil", date: "2026-01-01", year: "2026", month: "Enero", status: "Cumplido", notes: "Dato de ejemplo" },
@@ -1121,7 +1121,12 @@
     }
 
     function normalize(value) {
-      return String(value || "").toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "").trim();
+      return String(value || "")
+        .toLowerCase()
+        .normalize("NFD")
+        .replace(/[\u0300-\u036f]/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
     }
 
     function parseDate(value) {
@@ -1130,10 +1135,10 @@
 
     function personKey(turnOrValue) {
       if (typeof turnOrValue === "object") {
-        const phoneDigits = String(turnOrValue.phone || "").replace(/\D/g, "");
-        if (phoneDigits.length >= 7) return `fono:${phoneDigits}`;
         const normalizedName = normalize(turnOrValue.name || "");
         if (normalizedName) return `nombre:${normalizedName}`;
+        const phoneDigits = String(turnOrValue.phone || "").replace(/\D/g, "");
+        if (phoneDigits.length >= 7) return `fono:${phoneDigits}`;
         const firstEmail = String(turnOrValue.email || "").split(/[\/,; ]+/).find(item => item.includes("@"));
         if (firstEmail) return `email:${normalize(firstEmail)}`;
         return `id:${normalize(turnOrValue.id || "")}`;
@@ -1214,6 +1219,14 @@
         profile.lastTurn = profile.turns[0];
         profile.active = isActiveValue(profile.lastTurn?.active);
         profile.monthsWithoutTurn = monthsSince(profile.lastTurn?.date);
+        profile.searchText = normalize([
+          profile.name,
+          profile.id,
+          profile.address,
+          profile.phone,
+          profile.email,
+          ...profile.turns.map(turn => `${turn.name} ${turn.id} ${turn.address} ${turn.phone} ${turn.email} ${turn.subject} ${turn.court}`)
+        ].join(" "));
         return profile;
       }).sort((a, b) => a.name.localeCompare(b.name, "es"));
     }
@@ -1261,9 +1274,9 @@
       const subject = els.searchSubject.value;
       const minMonths = Number(els.searchMonths.value || 0);
       return groupLawyers().filter(profile => {
-        const matchesText = !text || normalize(`${profile.name} ${profile.email} ${profile.phone}`).includes(text);
-        const matchesSubject = !subject || profile.subjects.includes(subject);
-        const matchesMonths = profile.monthsWithoutTurn >= minMonths;
+        const matchesText = !text || profile.searchText.includes(text);
+        const matchesSubject = text ? true : (!subject || profile.subjects.includes(subject));
+        const matchesMonths = text ? true : profile.monthsWithoutTurn >= minMonths;
         return matchesText && matchesSubject && matchesMonths;
       });
     }
@@ -1872,13 +1885,16 @@
     }
 
     function updateEnabledInGoogleSheet(profile, enabledValue) {
-      if (!GOOGLE_APPS_SCRIPT_URL) return Promise.resolve(false);
+      if (!GOOGLE_APPS_SCRIPT_URL) return Promise.resolve({ ok: false, message: "No hay Apps Script configurado." });
       return new Promise(resolve => {
         const callbackName = `enabledSave_${Date.now()}_${Math.round(Math.random() * 100000)}`;
         const script = document.createElement("script");
         const timer = window.setTimeout(() => {
           cleanup();
-          resolve(false);
+          resolve({
+            ok: false,
+            message: "El Apps Script publicado no respondió a setEnabled. Copia el script actualizado y vuelve a desplegarlo."
+          });
         }, 12000);
 
         function cleanup() {
@@ -1889,16 +1905,19 @@
 
         window[callbackName] = payload => {
           cleanup();
-          resolve(Boolean(payload && payload.ok && payload.updated));
+          resolve(payload || { ok: false, message: "Respuesta vacía de Apps Script." });
         };
 
         script.onerror = () => {
           cleanup();
-          resolve(false);
+          resolve({
+            ok: false,
+            message: "El Apps Script no pudo ejecutarse. Revisa que la versión publicada incluya setEnabled."
+          });
         };
 
         const params = new URLSearchParams({
-          action: "setEnabled",
+          action: "setenabled",
           callback: callbackName,
           payload: JSON.stringify({
             enabled: enabledValue,
@@ -1926,9 +1945,9 @@
 
       els.lawyerDetail.querySelectorAll("[data-enabled-value]").forEach(button => button.disabled = true);
       showToast("Actualizando habilitación en Google Sheets...");
-      const updated = await updateEnabledInGoogleSheet(profile, enabledValue);
-      if (!updated) {
-        showToast("No se pudo actualizar la planilla. Revisa que el Apps Script esté actualizado y desplegado.");
+      const result = await updateEnabledInGoogleSheet(profile, enabledValue);
+      if (!result.ok || !result.updated) {
+        showToast(result.message || "No se pudo actualizar la planilla. Revisa que el Apps Script esté actualizado y desplegado.");
         renderLawyerDetail(profile);
         return;
       }
