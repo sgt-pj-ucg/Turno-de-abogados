@@ -865,13 +865,29 @@
 
     .alert-edit-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
-      gap: 10px;
-      align-items: end;
+      grid-template-columns: repeat(3, minmax(180px, 1fr)) 132px;
+      gap: 12px;
+      align-items: stretch;
+    }
+
+    .alert-edit-grid > .info-box,
+    .alert-edit-grid > .field {
+      min-height: 82px;
+      height: 100%;
+    }
+
+    .alert-edit-grid > .info-box {
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      padding: 14px 16px;
     }
 
     .alert-edit-grid .btn {
-      min-height: 40px;
+      align-self: stretch;
+      justify-content: center;
+      min-height: 82px;
+      width: 100%;
     }
 
     .proposal-list {
@@ -988,6 +1004,7 @@
       .actions .btn { flex: 1; }
       .contact-toolbar { align-items: flex-start; flex-direction: column; }
       .metrics, .contact-grid, .summary-grid, .form-grid, .rank-controls, .alert-grid, .alert-edit-grid { grid-template-columns: 1fr; }
+      .alert-edit-grid .btn { min-height: 48px; }
       .panel-header { align-items: flex-start; flex-direction: column; }
       .range-buttons button { min-width: 78px; }
     }
