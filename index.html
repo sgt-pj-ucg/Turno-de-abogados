@@ -490,6 +490,13 @@
       line-height: 1.35;
     }
 
+    .profile-actions {
+      display: flex;
+      gap: 8px;
+      justify-content: flex-end;
+      flex-wrap: wrap;
+    }
+
     .contact-grid, .summary-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -518,6 +525,26 @@
       color: var(--ink);
       overflow-wrap: anywhere;
       text-decoration: none;
+    }
+
+    .contact-edit-panel {
+      border: 1px solid #cfd6e2;
+      border-radius: 8px;
+      padding: 14px;
+      background: #fafbfc;
+      display: none;
+      gap: 12px;
+    }
+
+    .contact-edit-panel.visible {
+      display: grid;
+    }
+
+    .contact-edit-actions {
+      display: flex;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
     }
 
     .chips {
@@ -1396,6 +1423,9 @@
           </div>
           <div class="status-control">
             <span class="badge green">Especialidad sugerida: ${escapeHtml(specialties[0] || "Sin historial")}</span>
+            <div class="profile-actions">
+              <button class="btn" type="button" data-edit-contact="${escapeHtml(profile.key)}">Editar datos</button>
+            </div>
             <div>
               <span class="badge ${profile.active ? "green" : "red"}">Habilitado para turno</span>
               <div class="enabled-toggle" aria-label="Cambiar habilitación para turno">
@@ -1410,6 +1440,26 @@
           <div class="info-box"><span>Dirección</span><strong>${displayValue(profile.address)}</strong></div>
           <div class="info-box"><span>Teléfono</span><strong>${displayValue(profile.phone)}</strong></div>
           <div class="info-box"><span>Correo</span>${profile.email ? `<a href="mailto:${escapeHtml(profile.email)}">${escapeHtml(profile.email)}</a>` : "<strong>Sin información</strong>"}</div>
+        </div>
+        <div class="contact-edit-panel" data-contact-editor="${escapeHtml(profile.key)}">
+          <div class="form-grid">
+            <div class="field">
+              <label>Dirección</label>
+              <input type="text" data-profile-contact-field="address" value="${hasData(profile.address) ? escapeHtml(profile.address) : ""}" placeholder="Domicilio actualizado">
+            </div>
+            <div class="field">
+              <label>Teléfono</label>
+              <input type="text" data-profile-contact-field="phone" value="${hasData(profile.phone) ? escapeHtml(profile.phone) : ""}" placeholder="Teléfono actualizado">
+            </div>
+            <div class="field">
+              <label>Correo</label>
+              <input type="text" data-profile-contact-field="email" value="${hasData(profile.email) ? escapeHtml(profile.email) : ""}" placeholder="correo@dominio.cl">
+            </div>
+          </div>
+          <div class="contact-edit-actions">
+            <button class="btn" type="button" data-cancel-contact-edit="${escapeHtml(profile.key)}">Cancelar</button>
+            <button class="btn primary" type="button" data-save-profile-contact="${escapeHtml(profile.key)}">Guardar cambios</button>
+          </div>
         </div>
         <div class="summary-grid">
           <div class="info-box"><span>Materias históricas</span><div class="chips">${profile.subjects.map(item => `<span class="badge gold">${escapeHtml(item)}</span>`).join("")}</div></div>
@@ -2263,6 +2313,52 @@
       syncFromSheet({ keepSelected: true }).catch(() => renderAll());
     }
 
+    async function saveContactFromProfile(key) {
+      const profile = groupLawyers().find(item => item.key === key);
+      const panel = els.lawyerDetail.querySelector(`[data-contact-editor="${CSS.escape(key)}"]`);
+      if (!profile || !panel) return;
+      if (!canWriteSafely()) return;
+
+      const contact = {
+        address: panel.querySelector('[data-profile-contact-field="address"]')?.value.trim() || "",
+        phone: panel.querySelector('[data-profile-contact-field="phone"]')?.value.trim() || "",
+        email: panel.querySelector('[data-profile-contact-field="email"]')?.value.trim() || ""
+      };
+
+      if (!contact.email && !contact.phone && !contact.address) {
+        showToast("Completa al menos un dato antes de guardar.");
+        return;
+      }
+
+      const button = panel.querySelector("[data-save-profile-contact]");
+      if (button) {
+        button.disabled = true;
+        button.textContent = "Guardando...";
+      }
+
+      showToast(`Guardando datos de contacto de ${profile.name}...`);
+      const result = await updateContactInGoogleSheet(profile, contact);
+      if (!result.ok || !result.updated) {
+        if (button) {
+          button.disabled = false;
+          button.textContent = "Guardar cambios";
+        }
+        showToast(result.message || "No se pudieron actualizar los datos.");
+        return;
+      }
+
+      turns = turns.map(turn => personKey(turn) === key ? {
+        ...turn,
+        address: contact.address || turn.address,
+        phone: contact.phone || turn.phone,
+        email: contact.email || turn.email
+      } : turn);
+      renderAll();
+      renderLawyerDetail(groupLawyers().find(item => item.key === key));
+      showToast(`Datos actualizados: ${profile.name}.`);
+      syncFromSheet({ keepSelected: true }).catch(() => renderAll());
+    }
+
     async function setLawyerEnabled(key, enabledValue) {
       const profile = groupLawyers().find(item => item.key === key);
       if (!profile) return;
@@ -2431,6 +2527,27 @@
     });
 
     els.lawyerDetail.addEventListener("click", event => {
+      const editButton = event.target.closest("[data-edit-contact]");
+      if (editButton) {
+        const panel = els.lawyerDetail.querySelector(`[data-contact-editor="${CSS.escape(editButton.dataset.editContact)}"]`);
+        panel?.classList.add("visible");
+        panel?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        return;
+      }
+
+      const cancelButton = event.target.closest("[data-cancel-contact-edit]");
+      if (cancelButton) {
+        const panel = els.lawyerDetail.querySelector(`[data-contact-editor="${CSS.escape(cancelButton.dataset.cancelContactEdit)}"]`);
+        panel?.classList.remove("visible");
+        return;
+      }
+
+      const saveContactButton = event.target.closest("[data-save-profile-contact]");
+      if (saveContactButton) {
+        saveContactFromProfile(saveContactButton.dataset.saveProfileContact);
+        return;
+      }
+
       const button = event.target.closest("[data-enabled-value]");
       if (!button) return;
       setLawyerEnabled(button.dataset.key, button.dataset.enabledValue);
