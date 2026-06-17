@@ -1071,7 +1071,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzDt1AG8DupBQRX5JdwJYkI-eZ3Nn1SdWziM0b6evwrn7ngwkyvdqsJ0N3zMkWPqMI/exec";
-    const APP_VERSION = "2026-06-16-busqueda-habilitado-v8";
+    const APP_VERSION = "2026-06-16-busqueda-nombre-v9";
 
     const seedTurns = [
       { name: "Carolina Reyes M.", id: "12.345.678-9", address: "Monjitas 527, Santiago", phone: "+56 9 1111 2222", email: "carolina@example.cl", court: "1° Juzgado Civil", subject: "Civil", date: "2026-01-01", year: "2026", month: "Enero", status: "Cumplido", notes: "Dato de ejemplo" },
@@ -1219,13 +1219,9 @@
         profile.lastTurn = profile.turns[0];
         profile.active = isActiveValue(profile.lastTurn?.active);
         profile.monthsWithoutTurn = monthsSince(profile.lastTurn?.date);
-        profile.searchText = normalize([
+        profile.nameSearchText = normalize([
           profile.name,
-          profile.id,
-          profile.address,
-          profile.phone,
-          profile.email,
-          ...profile.turns.map(turn => `${turn.name} ${turn.id} ${turn.address} ${turn.phone} ${turn.email} ${turn.subject} ${turn.court}`)
+          ...profile.turns.map(turn => turn.name)
         ].join(" "));
         return profile;
       }).sort((a, b) => a.name.localeCompare(b.name, "es"));
@@ -1275,7 +1271,7 @@
       const subject = els.searchSubject.value;
       const minMonths = Number(els.searchMonths.value || 0);
       return groupLawyers().filter(profile => {
-        const matchesText = !text || profile.searchText.includes(text);
+        const matchesText = !text || profile.nameSearchText.includes(text);
         const matchesSubject = text ? true : (!subject || profile.subjects.includes(subject));
         const matchesMonths = text ? true : profile.monthsWithoutTurn >= minMonths;
         return matchesText && matchesSubject && matchesMonths;
