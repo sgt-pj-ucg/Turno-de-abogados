@@ -705,6 +705,18 @@
       border-radius: 8px;
       padding: 12px;
       background: #fff;
+      text-align: left;
+      cursor: pointer;
+      transition: .18s ease;
+    }
+
+    .alert-box:hover, .alert-box.active {
+      border-color: var(--blue);
+      box-shadow: 0 8px 18px rgba(37,93,155,.12);
+    }
+
+    .alert-box.active {
+      background: linear-gradient(90deg, #fff, var(--soft-blue));
     }
 
     .alert-box span {
@@ -721,6 +733,58 @@
       margin-top: 6px;
       color: var(--navy);
       font-size: 24px;
+    }
+
+    .alert-detail {
+      display: grid;
+      gap: 12px;
+      padding: 0 18px 18px;
+    }
+
+    .alert-detail-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      padding-top: 2px;
+    }
+
+    .alert-detail-head h4 {
+      margin: 0;
+      color: var(--navy);
+      font-size: 16px;
+    }
+
+    .alert-card {
+      border: 1px solid #e1e7ef;
+      border-radius: 8px;
+      padding: 14px;
+      background: #fff;
+      display: grid;
+      gap: 12px;
+    }
+
+    .alert-card-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: flex-start;
+    }
+
+    .alert-card-head strong {
+      color: var(--navy);
+      font-size: 16px;
+    }
+
+    .alert-edit-grid {
+      display: grid;
+      grid-template-columns: repeat(3, minmax(0, 1fr)) auto;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .alert-edit-grid .btn {
+      min-height: 40px;
     }
 
     .proposal-list {
@@ -835,7 +899,7 @@
       .topbar, .profile-head { display: grid; }
       .actions { justify-content: stretch; }
       .actions .btn { flex: 1; }
-      .metrics, .contact-grid, .summary-grid, .form-grid, .rank-controls { grid-template-columns: 1fr; }
+      .metrics, .contact-grid, .summary-grid, .form-grid, .rank-controls, .alert-grid, .alert-edit-grid { grid-template-columns: 1fr; }
       .panel-header { align-items: flex-start; flex-direction: column; }
       .range-buttons button { min-width: 78px; }
     }
@@ -1049,6 +1113,7 @@
             <span class="badge red">Calidad de datos</span>
           </div>
           <div class="alert-grid" id="alertPanel"></div>
+          <div class="alert-detail" id="alertDetail"></div>
         </section>
       </section>
     </main>
@@ -1071,7 +1136,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyS9N9xSXpJrOQSpC7eD47i7Af4tLZ3Aq1eihpAqzx0K3SrbrOU6CC6_lAY5E-SbZ4X/exec";
-    const APP_VERSION = "2026-06-16-busqueda-nombre-v9";
+    const APP_VERSION = "2026-06-17-alertas-editables-v10";
 
     const seedTurns = [
       { name: "Carolina Reyes M.", id: "12.345.678-9", address: "Monjitas 527, Santiago", phone: "+56 9 1111 2222", email: "carolina@example.cl", court: "1° Juzgado Civil", subject: "Civil", date: "2026-01-01", year: "2026", month: "Enero", status: "Cumplido", notes: "Dato de ejemplo" },
@@ -1083,6 +1148,7 @@
     let selectedLawyerKey = "";
     let rankingMinMonths = 0;
     let pendingTurn = null;
+    let selectedAlertType = "missingEmail";
     const selectedProposalKeys = new Set();
 
     const els = {
@@ -1099,6 +1165,7 @@
       monthRangeButtons: document.querySelector("#monthRangeButtons"),
       rankingSummary: document.querySelector("#rankingSummary"),
       alertPanel: document.querySelector("#alertPanel"),
+      alertDetail: document.querySelector("#alertDetail"),
       proposalList: document.querySelector("#proposalList"),
       proposalCount: document.querySelector("#proposalCount"),
       exportProposalButton: document.querySelector("#exportProposalButton"),
@@ -1383,17 +1450,124 @@
       document.querySelector("#metricSubjects").textContent = uniqueValues(turns, "subject").length;
     }
 
-    function renderAlerts() {
+    function alertGroups() {
       const profiles = groupLawyers();
-      const missingEmail = profiles.filter(profile => !hasData(profile.email)).length;
-      const missingPhone = profiles.filter(profile => !hasData(profile.phone)).length;
-      const missingAddress = profiles.filter(profile => !hasData(profile.address)).length;
-      const inactive = profiles.filter(profile => !profile.active).length;
-      els.alertPanel.innerHTML = `
-        <div class="alert-box"><span>Sin correo</span><strong>${missingEmail}</strong></div>
-        <div class="alert-box"><span>Sin teléfono</span><strong>${missingPhone}</strong></div>
-        <div class="alert-box"><span>Sin domicilio</span><strong>${missingAddress}</strong></div>
-        <div class="alert-box"><span>Excluidos del ranking</span><strong>${inactive}</strong></div>
+      return {
+        missingEmail: profiles.filter(profile => !hasData(profile.email)),
+        missingPhone: profiles.filter(profile => !hasData(profile.phone)),
+        missingAddress: profiles.filter(profile => !hasData(profile.address)),
+        inactive: profiles.filter(profile => !profile.active)
+      };
+    }
+
+    function alertConfig(type) {
+      return {
+        missingEmail: {
+          title: "Sin correo",
+          description: "Abogados con correo vacío o no informado.",
+          empty: "No hay abogados pendientes por correo."
+        },
+        missingPhone: {
+          title: "Sin teléfono",
+          description: "Abogados con teléfono vacío o no informado.",
+          empty: "No hay abogados pendientes por teléfono."
+        },
+        missingAddress: {
+          title: "Sin domicilio",
+          description: "Abogados con domicilio vacío o no informado.",
+          empty: "No hay abogados pendientes por domicilio."
+        },
+        inactive: {
+          title: "Excluidos del ranking",
+          description: "Abogados marcados como no habilitados para turnos.",
+          empty: "No hay abogados excluidos del ranking."
+        }
+      }[type] || {};
+    }
+
+    function renderAlerts() {
+      const groups = alertGroups();
+      const boxes = [
+        ["missingEmail", "Sin correo"],
+        ["missingPhone", "Sin teléfono"],
+        ["missingAddress", "Sin domicilio"],
+        ["inactive", "Excluidos del ranking"]
+      ];
+      els.alertPanel.innerHTML = boxes.map(([type, label]) => `
+        <button class="alert-box ${selectedAlertType === type ? "active" : ""}" type="button" data-alert-type="${type}">
+          <span>${label}</span>
+          <strong>${groups[type].length}</strong>
+        </button>
+      `).join("");
+      renderAlertDetail(groups);
+    }
+
+    function renderAlertDetail(groups = alertGroups()) {
+      const profiles = groups[selectedAlertType] || [];
+      const config = alertConfig(selectedAlertType);
+      els.alertDetail.innerHTML = `
+        <div class="alert-detail-head">
+          <div>
+            <h4>${escapeHtml(config.title || "Detalle")}</h4>
+            <p class="muted" style="margin:4px 0 0;">${escapeHtml(config.description || "")}</p>
+          </div>
+          <span class="badge blue">${profiles.length} registro${profiles.length === 1 ? "" : "s"}</span>
+        </div>
+        ${profiles.length ? profiles.map(profile => renderAlertCard(profile)).join("") : `<div class="empty">${escapeHtml(config.empty || "Sin registros pendientes.")}</div>`}
+      `;
+    }
+
+    function renderAlertCard(profile) {
+      const lastTurn = profile.lastTurn;
+      const lastInfo = lastTurn
+        ? `Último turno: ${lastTurn.month} ${lastTurn.year} · ${lastTurn.court || "Sin tribunal"} · ${lastTurn.subject || "Sin materia"}`
+        : "Sin turnos registrados";
+
+      if (selectedAlertType === "inactive") {
+        return `
+          <article class="alert-card" data-alert-key="${escapeHtml(profile.key)}">
+            <div class="alert-card-head">
+              <div>
+                <strong>${escapeHtml(profile.name)}</strong>
+                <p class="muted" style="margin:4px 0 0;">${escapeHtml(lastInfo)}</p>
+              </div>
+              <span class="badge red">No habilitado</span>
+            </div>
+            <div class="alert-edit-grid">
+              <div class="info-box"><span>Correo</span><strong>${displayValue(profile.email)}</strong></div>
+              <div class="info-box"><span>Teléfono</span><strong>${displayValue(profile.phone)}</strong></div>
+              <div class="info-box"><span>Domicilio</span><strong>${displayValue(profile.address)}</strong></div>
+              <button class="btn primary enable-from-alert" type="button" data-key="${escapeHtml(profile.key)}">Habilitar</button>
+            </div>
+          </article>
+        `;
+      }
+
+      return `
+        <article class="alert-card" data-alert-key="${escapeHtml(profile.key)}">
+          <div class="alert-card-head">
+            <div>
+              <strong>${escapeHtml(profile.name)}</strong>
+              <p class="muted" style="margin:4px 0 0;">${escapeHtml(lastInfo)}</p>
+            </div>
+            <span class="badge gold">${profile.turns.length} turno${profile.turns.length === 1 ? "" : "s"}</span>
+          </div>
+          <div class="alert-edit-grid">
+            <div class="field">
+              <label>Correo</label>
+              <input type="text" data-contact-field="email" value="${hasData(profile.email) ? escapeHtml(profile.email) : ""}" placeholder="correo@dominio.cl">
+            </div>
+            <div class="field">
+              <label>Teléfono</label>
+              <input type="text" data-contact-field="phone" value="${hasData(profile.phone) ? escapeHtml(profile.phone) : ""}" placeholder="Teléfono de contacto">
+            </div>
+            <div class="field">
+              <label>Domicilio</label>
+              <input type="text" data-contact-field="address" value="${hasData(profile.address) ? escapeHtml(profile.address) : ""}" placeholder="Dirección o domicilio">
+            </div>
+            <button class="btn primary save-contact" type="button" data-key="${escapeHtml(profile.key)}">Guardar datos</button>
+          </div>
+        </article>
       `;
     }
 
@@ -1936,6 +2110,97 @@
       });
     }
 
+    function updateContactInGoogleSheet(profile, contact) {
+      if (!GOOGLE_APPS_SCRIPT_URL) return Promise.resolve({ ok: false, message: "No hay Apps Script configurado." });
+      return new Promise(resolve => {
+        const callbackName = `contactSave_${Date.now()}_${Math.round(Math.random() * 100000)}`;
+        const script = document.createElement("script");
+        const timer = window.setTimeout(() => {
+          cleanup();
+          resolve({
+            ok: false,
+            message: "El Apps Script publicado no respondió a setcontact. Copia el script actualizado y vuelve a desplegarlo."
+          });
+        }, 12000);
+
+        function cleanup() {
+          window.clearTimeout(timer);
+          script.remove();
+          delete window[callbackName];
+        }
+
+        window[callbackName] = payload => {
+          cleanup();
+          resolve(payload || { ok: false, message: "Respuesta vacía de Apps Script." });
+        };
+
+        script.onerror = () => {
+          cleanup();
+          resolve({
+            ok: false,
+            message: "El Apps Script no pudo ejecutarse. Revisa que la versión publicada incluya setcontact."
+          });
+        };
+
+        const params = new URLSearchParams({
+          action: "setcontact",
+          callback: callbackName,
+          payload: JSON.stringify({
+            key: profile.key,
+            name: profile.name,
+            currentPhone: profile.phone,
+            currentEmail: profile.email,
+            phone: contact.phone,
+            email: contact.email,
+            address: contact.address
+          })
+        });
+        script.src = `${GOOGLE_APPS_SCRIPT_URL}?${params.toString()}`;
+        document.head.appendChild(script);
+      });
+    }
+
+    async function saveContactFromAlert(key, card) {
+      const profile = groupLawyers().find(item => item.key === key);
+      if (!profile || !card) return;
+      const contact = {
+        email: card.querySelector('[data-contact-field="email"]')?.value.trim() || "",
+        phone: card.querySelector('[data-contact-field="phone"]')?.value.trim() || "",
+        address: card.querySelector('[data-contact-field="address"]')?.value.trim() || ""
+      };
+
+      if (!contact.email && !contact.phone && !contact.address) {
+        showToast("Completa al menos un dato de contacto antes de guardar.");
+        return;
+      }
+
+      const button = card.querySelector(".save-contact");
+      if (button) {
+        button.disabled = true;
+        button.textContent = "Guardando...";
+      }
+      showToast(`Actualizando datos de ${profile.name}...`);
+      const result = await updateContactInGoogleSheet(profile, contact);
+      if (!result.ok || !result.updated) {
+        if (button) {
+          button.disabled = false;
+          button.textContent = "Guardar datos";
+        }
+        showToast(result.message || "No se pudieron actualizar los datos de contacto.");
+        return;
+      }
+
+      turns = turns.map(turn => personKey(turn) === key ? {
+        ...turn,
+        email: contact.email || turn.email,
+        phone: contact.phone || turn.phone,
+        address: contact.address || turn.address
+      } : turn);
+      renderAll();
+      showToast(`Datos actualizados en Google Sheets: ${profile.name}.`);
+      syncFromSheet({ keepSelected: true }).catch(() => renderAll());
+    }
+
     async function setLawyerEnabled(key, enabledValue) {
       const profile = groupLawyers().find(item => item.key === key);
       if (!profile) return;
@@ -2106,6 +2371,27 @@
       const button = event.target.closest("[data-enabled-value]");
       if (!button) return;
       setLawyerEnabled(button.dataset.key, button.dataset.enabledValue);
+    });
+
+    els.alertPanel.addEventListener("click", event => {
+      const button = event.target.closest("[data-alert-type]");
+      if (!button) return;
+      selectedAlertType = button.dataset.alertType;
+      renderAlerts();
+    });
+
+    els.alertDetail.addEventListener("click", event => {
+      const saveButton = event.target.closest(".save-contact");
+      if (saveButton) {
+        const card = saveButton.closest("[data-alert-key]");
+        saveContactFromAlert(saveButton.dataset.key, card);
+        return;
+      }
+
+      const enableButton = event.target.closest(".enable-from-alert");
+      if (enableButton) {
+        setLawyerEnabled(enableButton.dataset.key, "Sí");
+      }
     });
 
     ["input", "keyup", "search", "paste", "compositionend"].forEach(eventName => {
