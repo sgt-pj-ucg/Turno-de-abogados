@@ -906,9 +906,9 @@
           <section class="panel">
             <div class="panel-header">
               <h3>Registrar nuevo turno</h3>
-              <span class="badge gold">Formulario</span>
+              <button class="btn" id="newLawyerButton" type="button">Nuevo abogado(a)</button>
             </div>
-            <p class="save-note"><strong>Importante:</strong> Publicar la hoja en la web permite leer datos. Para guardar nuevos turnos en Google Sheets se necesita publicar un Google Apps Script como aplicación web y pegar su URL en <strong>GOOGLE_APPS_SCRIPT_URL</strong>. Mientras esa URL esté vacía, el guardado queda solo en esta página.</p>
+            <p class="save-note"><strong>Importante:</strong> Puedes usar un abogado(a) del ranking o presionar <strong>Nuevo abogado(a)</strong> para ingresar datos manualmente. Tribunal y materia siempre son editables y muestran opciones disponibles desde la planilla.</p>
             <p class="last-save" id="lastSaveStatus"></p>
             <form id="turnForm" novalidate>
               <div class="field">
@@ -930,16 +930,26 @@
                 <label for="lawyerAddress">Dirección</label>
                 <input id="lawyerAddress" placeholder="Domicilio profesional">
               </div>
+              <div class="field">
+                <label for="enabledInput">Habilitado turno</label>
+                <select id="enabledInput">
+                  <option selected>Sí</option>
+                  <option>No</option>
+                </select>
+                <p class="field-help">Si está en “No”, el abogado(a) no será considerado en el ranking.</p>
+              </div>
               <div class="form-grid">
                 <div class="field">
                   <label for="courtInput">Tribunal</label>
                   <input id="courtInput" list="courtOptions" required placeholder="Ej. Primer Juzgado de Letras">
                   <datalist id="courtOptions"></datalist>
+                  <p class="field-help">Puedes elegir una opción existente o escribir un tribunal nuevo.</p>
                 </div>
                 <div class="field">
                   <label for="subjectInput">Materia</label>
                   <input id="subjectInput" list="subjectOptions" required placeholder="Ej. Civil">
                   <datalist id="subjectOptions"></datalist>
+                  <p class="field-help">Puedes cambiarla aunque el abogado(a) venga desde el ranking.</p>
                 </div>
               </div>
               <div class="form-grid">
@@ -997,7 +1007,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwUyTXbpMPo3FOL8dHfq-gZSRavhVs6gnDdIFrA0WeXtKFbzQrPxgUF4wkxJ2XmSDp4/exec";
-    const APP_VERSION = "2026-06-16-tribunales-alertas-v3";
+    const APP_VERSION = "2026-06-16-habilitado-turno-v4";
 
     const seedTurns = [
       { name: "Carolina Reyes M.", id: "12.345.678-9", address: "Monjitas 527, Santiago", phone: "+56 9 1111 2222", email: "carolina@example.cl", court: "1° Juzgado Civil", subject: "Civil", date: "2026-01-01", year: "2026", month: "Enero", status: "Cumplido", notes: "Dato de ejemplo" },
@@ -1484,6 +1494,7 @@
       document.querySelector("#lawyerEmail").value = profile.email || "";
       document.querySelector("#lawyerPhone").value = profile.phone || "";
       document.querySelector("#lawyerAddress").value = profile.address || "";
+      document.querySelector("#enabledInput").value = "Sí";
       document.querySelector("#subjectInput").value = subject;
       document.querySelector("#courtInput").value = court;
       if (!document.querySelector("#turnDate").value) {
@@ -1491,6 +1502,15 @@
       }
       document.querySelector("#lawyerName").focus();
       showToast("Datos del abogado cargados en el formulario.");
+    }
+
+    function startNewLawyerEntry() {
+      const form = document.querySelector("#turnForm");
+      form.reset();
+      document.querySelector("#enabledInput").value = "Sí";
+      document.querySelector("#statusInput").value = "Programado";
+      document.querySelector("#lawyerName").focus();
+      showToast("Formulario libre para ingresar un nuevo abogado(a).");
     }
 
     function renderAll() {
@@ -1612,7 +1632,7 @@
           year: year || date.slice(0, 4),
           month: month || monthFmt.format(parseDate(date)),
           status: pick("estado registro", "estado") || "Programado",
-          active: pick("activo para procesamiento", "activo") || "Sí",
+          active: pick("habilitado turno", "activo para procesamiento", "activo") || "Sí",
           notes: pick("observaciones", "documento fuente")
         };
       }).filter(turn => turn.name && turn.date);
@@ -1809,6 +1829,7 @@
           <div class="info-box"><span>Tribunal</span><strong>${escapeHtml(turn.court)}</strong></div>
           <div class="info-box"><span>Mes</span><strong>${escapeHtml(turn.month)} ${escapeHtml(turn.year)}</strong></div>
           <div class="info-box"><span>Estado</span><strong>${escapeHtml(turn.status)}</strong></div>
+          <div class="info-box"><span>Habilitado turno</span><strong>${escapeHtml(turn.active)}</strong></div>
           <div class="info-box"><span>Contacto</span><strong>${displayValue(turn.email || turn.phone)}</strong></div>
         </div>
         ${warnings.length ? `
@@ -1894,7 +1915,7 @@
         year: monthValue.slice(0, 4),
         month: monthFmt.format(parseDate(`${monthValue}-01`)).split(" de ")[0],
         status: document.querySelector("#statusInput").value,
-        active: "Sí",
+        active: document.querySelector("#enabledInput").value || "Sí",
         notes: document.querySelector("#notesInput").value.trim()
       };
       pendingTurn = newTurn;
@@ -1934,6 +1955,7 @@
     });
     els.exportProposalButton.addEventListener("click", exportProposalPdf);
     document.querySelector("#suggestButton").addEventListener("click", renderCandidates);
+    document.querySelector("#newLawyerButton").addEventListener("click", startNewLawyerEntry);
     document.querySelector("#refreshButton").addEventListener("click", syncFromSheet);
     document.querySelector("#syncButton").addEventListener("click", syncFromSheet);
     document.querySelector("#goNewTurn").addEventListener("click", () => showView("newTurn"));
