@@ -446,6 +446,50 @@
       letter-spacing: 0;
     }
 
+    .status-control {
+      display: grid;
+      gap: 8px;
+      justify-items: end;
+    }
+
+    .enabled-toggle {
+      border: 1px solid #cfd6e2;
+      background: #fff;
+      border-radius: 999px;
+      padding: 4px;
+      display: inline-flex;
+      gap: 4px;
+      box-shadow: 0 8px 18px rgba(20,33,61,.08);
+    }
+
+    .enabled-toggle button {
+      border: 0;
+      border-radius: 999px;
+      min-height: 32px;
+      padding: 6px 12px;
+      background: transparent;
+      color: var(--muted);
+      cursor: pointer;
+      font-weight: 800;
+    }
+
+    .enabled-toggle button.active.yes {
+      background: #dff8f5;
+      color: var(--green);
+    }
+
+    .enabled-toggle button.active.no {
+      background: #fde8e6;
+      color: var(--red);
+    }
+
+    .status-control small {
+      color: var(--muted);
+      max-width: 280px;
+      text-align: right;
+      line-height: 1.35;
+    }
+
     .contact-grid, .summary-grid {
       display: grid;
       grid-template-columns: repeat(3, minmax(0, 1fr));
@@ -1027,7 +1071,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzDt1AG8DupBQRX5JdwJYkI-eZ3Nn1SdWziM0b6evwrn7ngwkyvdqsJ0N3zMkWPqMI/exec";
-    const APP_VERSION = "2026-06-16-habilitado-turno-v4";
+    const APP_VERSION = "2026-06-16-habilitado-switch-v5";
 
     const seedTurns = [
       { name: "Carolina Reyes M.", id: "12.345.678-9", address: "Monjitas 527, Santiago", phone: "+56 9 1111 2222", email: "carolina@example.cl", court: "1° Juzgado Civil", subject: "Civil", date: "2026-01-01", year: "2026", month: "Enero", status: "Cumplido", notes: "Dato de ejemplo" },
@@ -1263,7 +1307,17 @@
             <h3>${escapeHtml(profile.name)}</h3>
             <p class="muted">${profile.monthsWithoutTurn} meses sin turno · Último turno: ${profile.lastTurn ? escapeHtml(profile.lastTurn.month + " " + profile.lastTurn.year) : "Sin registro"}</p>
           </div>
-          <span class="badge green">Especialidad sugerida: ${escapeHtml(specialties[0] || "Sin historial")}</span>
+          <div class="status-control">
+            <span class="badge green">Especialidad sugerida: ${escapeHtml(specialties[0] || "Sin historial")}</span>
+            <div>
+              <span class="badge ${profile.active ? "green" : "red"}">Habilitado para turno</span>
+              <div class="enabled-toggle" aria-label="Cambiar habilitación para turno">
+                <button type="button" class="yes ${profile.active ? "active" : ""}" data-enabled-value="Sí" data-key="${escapeHtml(profile.key)}">Sí</button>
+                <button type="button" class="no ${!profile.active ? "active" : ""}" data-enabled-value="No" data-key="${escapeHtml(profile.key)}">No</button>
+              </div>
+            </div>
+            <small>Este estado controla si aparece o no en el ranking de nuevo turno.</small>
+          </div>
         </div>
         <div class="contact-grid">
           <div class="info-box"><span>Dirección</span><strong>${displayValue(profile.address)}</strong></div>
@@ -1768,15 +1822,16 @@
       return loadSheetViaGviz();
     }
 
-    async function syncFromSheet() {
+    async function syncFromSheet(options = {}) {
       showToast("Sincronizando planilla...");
+      const keepSelectedKey = options.keepSelected ? selectedLawyerKey : "";
       const [headersRaw, ...rows] = await loadSheetRows();
       const loadedTurns = mapRowsToTurns(headersRaw, rows);
       if (loadedTurns.length < 10) throw new Error("La planilla no devolvió registros válidos.");
       turns = loadedTurns;
-      selectedLawyerKey = "";
+      selectedLawyerKey = keepSelectedKey;
       renderAll();
-      renderLawyerDetail(null);
+      renderLawyerDetail(keepSelectedKey ? groupLawyers().find(profile => profile.key === keepSelectedKey) : null);
       showToast(`Datos sincronizados: ${turns.length} turnos, ${groupLawyers().length} abogados.`);
     }
 
@@ -1814,6 +1869,75 @@
         script.src = `${GOOGLE_APPS_SCRIPT_URL}?${params.toString()}`;
         document.head.appendChild(script);
       });
+    }
+
+    function updateEnabledInGoogleSheet(profile, enabledValue) {
+      if (!GOOGLE_APPS_SCRIPT_URL) return Promise.resolve(false);
+      return new Promise(resolve => {
+        const callbackName = `enabledSave_${Date.now()}_${Math.round(Math.random() * 100000)}`;
+        const script = document.createElement("script");
+        const timer = window.setTimeout(() => {
+          cleanup();
+          resolve(false);
+        }, 12000);
+
+        function cleanup() {
+          window.clearTimeout(timer);
+          script.remove();
+          delete window[callbackName];
+        }
+
+        window[callbackName] = payload => {
+          cleanup();
+          resolve(Boolean(payload && payload.ok && payload.updated));
+        };
+
+        script.onerror = () => {
+          cleanup();
+          resolve(false);
+        };
+
+        const params = new URLSearchParams({
+          action: "setEnabled",
+          callback: callbackName,
+          payload: JSON.stringify({
+            enabled: enabledValue,
+            key: profile.key,
+            name: profile.name,
+            phone: profile.phone,
+            email: profile.email
+          })
+        });
+        script.src = `${GOOGLE_APPS_SCRIPT_URL}?${params.toString()}`;
+        document.head.appendChild(script);
+      });
+    }
+
+    async function setLawyerEnabled(key, enabledValue) {
+      const profile = groupLawyers().find(item => item.key === key);
+      if (!profile) return;
+      const currentValue = profile.active ? "Sí" : "No";
+      if (currentValue === enabledValue) return;
+      const confirmed = window.confirm(
+        `¿Cambiar habilitación de ${profile.name} a "${enabledValue}"?\n\n` +
+        "Esto actualizará la columna Habilitado Turno en Google Sheets y afectará el ranking."
+      );
+      if (!confirmed) return;
+
+      els.lawyerDetail.querySelectorAll("[data-enabled-value]").forEach(button => button.disabled = true);
+      showToast("Actualizando habilitación en Google Sheets...");
+      const updated = await updateEnabledInGoogleSheet(profile, enabledValue);
+      if (!updated) {
+        showToast("No se pudo actualizar la planilla. Revisa que el Apps Script esté actualizado y desplegado.");
+        renderLawyerDetail(profile);
+        return;
+      }
+
+      turns = turns.map(turn => personKey(turn) === key ? { ...turn, active: enabledValue } : turn);
+      renderAll();
+      renderLawyerDetail(groupLawyers().find(item => item.key === key));
+      showToast(`Habilitación actualizada: ${profile.name} quedó en ${enabledValue}.`);
+      syncFromSheet({ keepSelected: true }).catch(() => showToast("Cambio guardado; no se pudo refrescar la planilla en este momento."));
     }
 
     function matchingLawyerTurns(turn) {
@@ -1951,6 +2075,12 @@
     els.lawyerResults.addEventListener("click", event => {
       const button = event.target.closest(".lawyer-option");
       if (button) selectLawyer(button.dataset.key);
+    });
+
+    els.lawyerDetail.addEventListener("click", event => {
+      const button = event.target.closest("[data-enabled-value]");
+      if (!button) return;
+      setLawyerEnabled(button.dataset.key, button.dataset.enabledValue);
     });
 
     [els.searchName, els.searchSubject, els.searchMonths].forEach(control => {
