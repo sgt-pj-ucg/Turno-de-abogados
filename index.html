@@ -482,32 +482,6 @@
       gap: 8px;
     }
 
-    .history-list {
-      display: grid;
-      gap: 8px;
-      margin: 0;
-      padding: 0;
-      list-style: none;
-    }
-
-    .history-list li {
-      border: 1px solid #edf0f5;
-      border-radius: 8px;
-      padding: 9px 10px;
-      background: #fafbfc;
-      display: grid;
-      gap: 2px;
-    }
-
-    .history-list strong {
-      overflow-wrap: anywhere;
-    }
-
-    .history-list small {
-      color: var(--muted);
-      font-size: 12px;
-    }
-
     .table-wrap { overflow: auto; }
 
     table {
@@ -1216,49 +1190,6 @@
         .filter(Boolean);
     }
 
-    function splitContactValues(value, type) {
-      const raw = String(value || "").trim();
-      if (!raw) return [];
-      if (type === "email") {
-        return raw
-          .split(/[\/,;\s]+/)
-          .map(item => item.trim())
-          .filter(item => item.includes("@"));
-      }
-      return raw
-        .split(/\s+\/\s+|\s+;\s+|\s+\|\s+/)
-        .map(item => item.trim())
-        .filter(Boolean);
-    }
-
-    function uniqueHistoryValues(turns, key, type) {
-      const seen = new Set();
-      const items = [];
-      turns.forEach(turn => {
-        splitContactValues(turn[key], type).forEach(value => {
-          const normalized = normalize(value);
-          if (!normalized || seen.has(normalized) || !hasData(value)) return;
-          seen.add(normalized);
-          items.push({
-            value,
-            date: turn.date,
-            label: `${turn.month} ${turn.year}`
-          });
-        });
-      });
-      return items;
-    }
-
-    function renderHistoryList(items) {
-      if (!items.length) return "<strong>Sin información</strong>";
-      return `<ul class="history-list">${items.map(item => `
-        <li>
-          <strong>${escapeHtml(item.value)}</strong>
-          <small>Registrado en turno de ${escapeHtml(item.label)}</small>
-        </li>
-      `).join("")}</ul>`;
-    }
-
     function fillSelect(select, values) {
       const current = select.value;
       const first = select.querySelector("option")?.outerHTML || "";
@@ -1326,9 +1257,6 @@
       els.selectedBadge.textContent = `${profile.turns.length} turnos`;
       els.lawyerDetail.className = "profile";
       const specialties = topSubjects(profile);
-      const emailHistory = uniqueHistoryValues(profile.turns, "email", "email");
-      const phoneHistory = uniqueHistoryValues(profile.turns, "phone", "phone");
-      const addressHistory = uniqueHistoryValues(profile.turns, "address", "address");
       els.lawyerDetail.innerHTML = `
         <div class="profile-head">
           <div>
@@ -1341,11 +1269,6 @@
           <div class="info-box"><span>Dirección</span><strong>${displayValue(profile.address)}</strong></div>
           <div class="info-box"><span>Teléfono</span><strong>${displayValue(profile.phone)}</strong></div>
           <div class="info-box"><span>Correo</span>${profile.email ? `<a href="mailto:${escapeHtml(profile.email)}">${escapeHtml(profile.email)}</a>` : "<strong>Sin información</strong>"}</div>
-        </div>
-        <div class="contact-grid">
-          <div class="info-box"><span>Domicilios registrados</span>${renderHistoryList(addressHistory)}</div>
-          <div class="info-box"><span>Teléfonos registrados</span>${renderHistoryList(phoneHistory)}</div>
-          <div class="info-box"><span>Correos registrados</span>${renderHistoryList(emailHistory)}</div>
         </div>
         <div class="summary-grid">
           <div class="info-box"><span>Materias históricas</span><div class="chips">${profile.subjects.map(item => `<span class="badge gold">${escapeHtml(item)}</span>`).join("")}</div></div>
