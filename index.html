@@ -203,6 +203,26 @@
       font-weight: 700;
     }
 
+    .btn.success {
+      background: var(--green);
+      color: #fff;
+      border-color: var(--green);
+      font-weight: 800;
+      box-shadow: 0 8px 18px rgba(15, 118, 110, .22);
+    }
+
+    .btn.success::before {
+      content: "+";
+      width: 20px;
+      height: 20px;
+      display: inline-grid;
+      place-items: center;
+      border-radius: 50%;
+      background: rgba(255,255,255,.22);
+      font-weight: 900;
+      line-height: 1;
+    }
+
     .btn.ghost {
       background: transparent;
       border-color: rgba(255,255,255,.28);
@@ -906,7 +926,7 @@
           <section class="panel">
             <div class="panel-header">
               <h3>Registrar nuevo turno</h3>
-              <button class="btn" id="newLawyerButton" type="button">Nuevo abogado(a)</button>
+              <button class="btn success" id="newLawyerButton" type="button">Nuevo abogado(a)</button>
             </div>
             <p class="save-note"><strong>Importante:</strong> Puedes usar un abogado(a) del ranking o presionar <strong>Nuevo abogado(a)</strong> para ingresar datos manualmente. Tribunal y materia siempre son editables y muestran opciones disponibles desde la planilla.</p>
             <p class="last-save" id="lastSaveStatus"></p>
@@ -1006,7 +1026,7 @@
 
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
-    const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwUyTXbpMPo3FOL8dHfq-gZSRavhVs6gnDdIFrA0WeXtKFbzQrPxgUF4wkxJ2XmSDp4/exec";
+    const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzDt1AG8DupBQRX5JdwJYkI-eZ3Nn1SdWziM0b6evwrn7ngwkyvdqsJ0N3zMkWPqMI/exec";
     const APP_VERSION = "2026-06-16-habilitado-turno-v4";
 
     const seedTurns = [
@@ -1488,8 +1508,8 @@
     function useCandidate(key) {
       const profile = groupLawyers().find(item => item.key === key);
       if (!profile) return;
-      const subject = els.suggestSubject.value || topSubjects(profile)[0] || "";
-      const court = els.suggestCourt.value || profile.lastTurn?.court || "";
+      const subject = els.suggestSubject.value || "";
+      const court = els.suggestCourt.value || "";
       document.querySelector("#lawyerName").value = profile.name || "";
       document.querySelector("#lawyerEmail").value = profile.email || "";
       document.querySelector("#lawyerPhone").value = profile.phone || "";
@@ -1497,11 +1517,13 @@
       document.querySelector("#enabledInput").value = "Sí";
       document.querySelector("#subjectInput").value = subject;
       document.querySelector("#courtInput").value = court;
+      document.querySelector("#subjectInput").readOnly = false;
+      document.querySelector("#courtInput").readOnly = false;
       if (!document.querySelector("#turnDate").value) {
         document.querySelector("#turnDate").value = nextMonthValue();
       }
-      document.querySelector("#lawyerName").focus();
-      showToast("Datos del abogado cargados en el formulario.");
+      document.querySelector("#courtInput").focus();
+      showToast("Datos del abogado cargados. Selecciona tribunal y materia para este nuevo turno.");
     }
 
     function startNewLawyerEntry() {
@@ -1509,6 +1531,8 @@
       form.reset();
       document.querySelector("#enabledInput").value = "Sí";
       document.querySelector("#statusInput").value = "Programado";
+      document.querySelector("#subjectInput").readOnly = false;
+      document.querySelector("#courtInput").readOnly = false;
       document.querySelector("#lawyerName").focus();
       showToast("Formulario libre para ingresar un nuevo abogado(a).");
     }
