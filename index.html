@@ -1135,8 +1135,9 @@
 
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
-    const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw2v2jcG_Z-5jKB1gFd2fXz9FUvLXDn0gQF1j22QpHWzOn5tHKY0xeUEp8Y_Q4tWxw6/exec";
-    const APP_VERSION = "2026-06-17-alertas-editables-v11";
+    const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycby4yTMY11uKh55QfAX0d_EiniX7trixkS6LQNStv-H7rKocbQe3lDPFDYpQZax8KgT7/exec";
+    const APP_VERSION = "2026-06-17-alertas-editables-v13";
+    const REQUIRED_SCRIPT_VERSION = "2026-06-17-strict-name-match-v5";
 
     const seedTurns = [
       { name: "Carolina Reyes M.", id: "12.345.678-9", address: "Monjitas 527, Santiago", phone: "+56 9 1111 2222", email: "carolina@example.cl", court: "1° Juzgado Civil", subject: "Civil", date: "2026-01-01", year: "2026", month: "Enero", status: "Cumplido", notes: "Dato de ejemplo" },
@@ -1149,6 +1150,8 @@
     let rankingMinMonths = 0;
     let pendingTurn = null;
     let selectedAlertType = "missingEmail";
+    let scriptVersionOk = null;
+    let publishedScriptVersion = "";
     const selectedProposalKeys = new Set();
 
     const els = {
@@ -2033,6 +2036,58 @@
       showToast(`Datos sincronizados: ${turns.length} turnos, ${groupLawyers().length} abogados.`);
     }
 
+    function checkAppsScriptVersion() {
+      if (!GOOGLE_APPS_SCRIPT_URL) return Promise.resolve(false);
+      return new Promise(resolve => {
+        const callbackName = `scriptStatus_${Date.now()}_${Math.round(Math.random() * 100000)}`;
+        const script = document.createElement("script");
+        const timer = window.setTimeout(() => {
+          cleanup();
+          scriptVersionOk = false;
+          resolve(false);
+        }, 10000);
+
+        function cleanup() {
+          window.clearTimeout(timer);
+          script.remove();
+          delete window[callbackName];
+        }
+
+        window[callbackName] = payload => {
+          cleanup();
+          publishedScriptVersion = payload?.version || "";
+          scriptVersionOk = publishedScriptVersion === REQUIRED_SCRIPT_VERSION;
+          const suffix = scriptVersionOk ? "seguro" : `requiere publicar ${REQUIRED_SCRIPT_VERSION}`;
+          document.querySelector("#versionLabel").textContent = `Versión ${APP_VERSION} · Script ${publishedScriptVersion || "sin versión"} (${suffix})`;
+          if (!scriptVersionOk) {
+            showToast(`Apps Script publicado: ${publishedScriptVersion || "sin versión"}. No se enviarán cambios de habilitación hasta publicar ${REQUIRED_SCRIPT_VERSION}.`);
+          }
+          resolve(scriptVersionOk);
+        };
+
+        script.onerror = () => {
+          cleanup();
+          scriptVersionOk = false;
+          resolve(false);
+        };
+
+        const params = new URLSearchParams({
+          action: "status",
+          callback: callbackName,
+          cacheBust: Date.now()
+        });
+        script.src = `${GOOGLE_APPS_SCRIPT_URL}?${params.toString()}`;
+        document.head.appendChild(script);
+      });
+    }
+
+    function canWriteSafely() {
+      if (scriptVersionOk === true) return true;
+      showToast(`No se enviará el cambio: Apps Script publicado está en ${publishedScriptVersion || "versión antigua o no verificada"}. Publica ${REQUIRED_SCRIPT_VERSION}.`);
+      checkAppsScriptVersion();
+      return false;
+    }
+
     function saveTurnToGoogleSheet(turn) {
       if (!GOOGLE_APPS_SCRIPT_URL) return Promise.resolve(false);
       return new Promise(resolve => {
@@ -2170,6 +2225,7 @@
     async function saveContactFromAlert(key, card) {
       const profile = groupLawyers().find(item => item.key === key);
       if (!profile || !card) return;
+      if (!canWriteSafely()) return;
       const contact = {
         email: card.querySelector('[data-contact-field="email"]')?.value.trim() || "",
         phone: card.querySelector('[data-contact-field="phone"]')?.value.trim() || "",
@@ -2211,6 +2267,7 @@
     async function setLawyerEnabled(key, enabledValue) {
       const profile = groupLawyers().find(item => item.key === key);
       if (!profile) return;
+      if (!canWriteSafely()) return;
       const currentValue = profile.active ? "Sí" : "No";
       if (currentValue === enabledValue) return;
       const confirmed = window.confirm(
@@ -2458,6 +2515,7 @@
     document.querySelector("#versionLabel").textContent = `Versión ${APP_VERSION}`;
     renderAll();
     renderLawyerDetail(null);
+    checkAppsScriptVersion();
     syncFromSheet().catch(() => showToast("No se pudo sincronizar la planilla; se muestran datos de ejemplo."));
   </script>
 </body>
