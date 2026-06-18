@@ -230,6 +230,34 @@
       width: 100%;
     }
 
+    .sheet-shortcut {
+      margin-top: 10px;
+      width: 100%;
+      justify-content: center;
+      min-height: 42px;
+      border-color: rgba(255,255,255,.24);
+      background: rgba(255,255,255,.06);
+      color: rgba(255,255,255,.88);
+      font-weight: 600;
+      box-shadow: none;
+      transition: background .2s ease, border-color .2s ease;
+    }
+
+    .sheet-shortcut:hover {
+      background: rgba(255,255,255,.1);
+      border-color: rgba(255,255,255,.34);
+    }
+
+    .sheet-shortcut::before {
+      content: "";
+      width: 14px;
+      height: 16px;
+      border: 2px solid currentColor;
+      border-radius: 3px;
+      box-shadow: inset 0 5px 0 rgba(255,255,255,.35);
+      opacity: .72;
+    }
+
     .btn:focus-visible, input:focus-visible, select:focus-visible, textarea:focus-visible, nav button:focus-visible {
       outline: 3px solid rgba(37,93,155,.25);
       outline-offset: 2px;
@@ -1045,6 +1073,7 @@
         <p>Datos conectados a la planilla Google Sheets entregada. La sincronización actualiza búsqueda, ficha y ranking.</p>
         <p id="versionLabel" style="margin-top:-4px;font-size:11px;color:rgba(255,255,255,.58);"></p>
         <button class="btn ghost" id="syncButton" type="button">Sincronizar datos</button>
+        <a class="btn sheet-shortcut" id="sheetShortcut" href="https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/edit?usp=sharing" target="_blank" rel="noopener">Abrir planilla</a>
       </div>
     </aside>
 
@@ -1055,7 +1084,6 @@
           <p id="pageSubtitle">Busca libremente por nombre, revisa datos de contacto y consulta todos los turnos realizados por año, mes, tribunal y materia.</p>
         </div>
         <div class="actions">
-          <a class="btn" id="sheetShortcut" href="https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/edit?usp=sharing" target="_blank" rel="noopener">Abrir planilla</a>
           <button class="btn" id="refreshButton" type="button">Actualizar datos</button>
           <button class="btn primary" id="goNewTurn" type="button">Nuevo turno</button>
         </div>
