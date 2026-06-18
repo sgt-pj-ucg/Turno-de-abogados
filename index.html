@@ -647,6 +647,15 @@
       align-items: end;
     }
 
+    .rank-search {
+      grid-column: span 2;
+    }
+
+    .rank-action {
+      width: 100%;
+      min-height: 44px;
+    }
+
     .range-buttons {
       display: flex;
       flex-wrap: wrap;
@@ -767,6 +776,12 @@
       opacity: 1;
       transform: translateY(0);
       pointer-events: auto;
+    }
+
+    .back-bottom {
+      bottom: 28px;
+      background: var(--green);
+      border-color: var(--green);
     }
 
     .save-note {
@@ -1004,6 +1019,7 @@
       .actions .btn { flex: 1; }
       .contact-toolbar { align-items: flex-start; flex-direction: column; }
       .metrics, .contact-grid, .summary-grid, .form-grid, .rank-controls, .alert-grid, .alert-edit-grid { grid-template-columns: 1fr; }
+      .rank-search { grid-column: span 1; }
       .alert-edit-grid .btn { min-height: 48px; }
       .panel-header { align-items: flex-start; flex-direction: column; }
       .range-buttons button { min-width: 78px; }
@@ -1107,6 +1123,10 @@
               <span class="badge green" id="nextMonthLabel">Próximo mes</span>
             </div>
             <div class="rank-controls">
+              <div class="field rank-search">
+                <label for="rankingSearch">Buscar abogado habilitado</label>
+                <input id="rankingSearch" type="search" placeholder="Nombre o apellido dentro del ranking">
+              </div>
               <div class="field">
                 <label for="suggestSubject">Materia requerida</label>
                 <select id="suggestSubject"><option value="">Cualquiera</option></select>
@@ -1125,7 +1145,7 @@
                   <button type="button" data-min-months="36">36+</button>
                 </div>
               </div>
-              <button class="btn gold" id="suggestButton" type="button">Actualizar ranking</button>
+              <button class="btn gold rank-action" id="suggestButton" type="button">Actualizar ranking</button>
             </div>
             <p class="ranking-summary" id="rankingSummary" style="padding:14px 18px 0;">El ranking se ordena por meses sin turno y afinidad con la materia o tribunal seleccionado.</p>
             <div class="candidate-list" id="candidateList"></div>
@@ -1244,6 +1264,7 @@
   </div>
 
   <button class="back-top" id="backTop" type="button">Arriba</button>
+  <button class="back-top back-bottom" id="backBottom" type="button">Abajo</button>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script>
@@ -1277,6 +1298,7 @@
       lawyerDetail: document.querySelector("#lawyerDetail"),
       lawyerCount: document.querySelector("#lawyerCount"),
       selectedBadge: document.querySelector("#selectedBadge"),
+      rankingSearch: document.querySelector("#rankingSearch"),
       suggestCourt: document.querySelector("#suggestCourt"),
       suggestSubject: document.querySelector("#suggestSubject"),
       candidateList: document.querySelector("#candidateList"),
@@ -1293,6 +1315,7 @@
       acceptConfirm: document.querySelector("#acceptConfirm"),
       lastSaveStatus: document.querySelector("#lastSaveStatus"),
       backTop: document.querySelector("#backTop"),
+      backBottom: document.querySelector("#backBottom"),
       toast: document.querySelector("#toast")
     };
 
@@ -1932,6 +1955,7 @@
     function renderCandidates() {
       const subject = els.suggestSubject.value;
       const court = els.suggestCourt.value;
+      const rankingText = normalize(els.rankingSearch.value || "");
       const activeProfiles = groupLawyers().filter(profile => profile.active);
       const ranked = activeProfiles.map(profile => {
         const specialties = topSubjects(profile);
@@ -1944,10 +1968,11 @@
         const matchesSubject = !subject || profile.subjects.includes(subject);
         const matchesCourt = !court || profile.courts.includes(court);
         const matchesMonths = profile.monthsWithoutTurn >= rankingMinMonths;
-        return matchesSubject && matchesCourt && matchesMonths;
+        const matchesText = !rankingText || profile.nameSearchText.includes(rankingText);
+        return matchesSubject && matchesCourt && matchesMonths && matchesText;
       }).sort((a, b) => b.score - a.score || b.monthsWithoutTurn - a.monthsWithoutTurn || a.name.localeCompare(b.name, "es"));
 
-      const candidates = ranked.length ? ranked : activeProfiles.map(profile => {
+      const candidates = (ranked.length || rankingText) ? ranked : activeProfiles.map(profile => {
         const specialties = topSubjects(profile);
         const repeatPenalty = Math.max(0, profile.turns.length - 1) * 2;
         return { ...profile, specialties, score: profile.monthsWithoutTurn * 3 - repeatPenalty };
@@ -1955,11 +1980,13 @@
         .sort((a, b) => b.score - a.score || b.monthsWithoutTurn - a.monthsWithoutTurn || a.name.localeCompare(b.name, "es"));
 
       els.rankingSummary.textContent = ranked.length
-        ? `${candidates.length} candidato${candidates.length === 1 ? "" : "s"} con ${rankingMinMonths}+ meses sin turno${subject ? ` para materia ${subject}` : ""}${court ? ` en ${court}` : ""}.`
-        : `No hay candidatos con todos los filtros seleccionados; se muestra el ranking general de ${candidates.length} abogados con ${rankingMinMonths}+ meses sin turno.`;
+        ? `${candidates.length} candidato${candidates.length === 1 ? "" : "s"} habilitado${candidates.length === 1 ? "" : "s"} con ${rankingMinMonths}+ meses sin turno${rankingText ? ` que coinciden con "${els.rankingSearch.value.trim()}"` : ""}${subject ? ` para materia ${subject}` : ""}${court ? ` en ${court}` : ""}.`
+        : rankingText
+          ? `No hay abogados habilitados que coincidan con "${els.rankingSearch.value.trim()}" y los filtros seleccionados.`
+          : `No hay candidatos con todos los filtros seleccionados; se muestra el ranking general de ${candidates.length} abogados con ${rankingMinMonths}+ meses sin turno.`;
 
       if (!candidates.length) {
-        els.candidateList.innerHTML = `<div class="empty">No hay abogados que cumplan el rango de meses seleccionado.</div>`;
+        els.candidateList.innerHTML = `<div class="empty">No hay abogados habilitados que cumplan los filtros seleccionados.</div>`;
         return;
       }
 
@@ -2048,6 +2075,7 @@
         : isAlerts
           ? "Revisa datos faltantes, abogados excluidos del ranking y calidad de contacto."
           : "Busca libremente por nombre, revisa datos de contacto y consulta todos los turnos realizados por año, mes, tribunal y materia.";
+      updateFloatingButtons();
     }
 
     function showToast(message) {
@@ -2788,6 +2816,9 @@
     });
 
     [els.suggestCourt, els.suggestSubject].forEach(control => control.addEventListener("change", renderCandidates));
+    ["input", "search", "keyup", "paste"].forEach(eventName => {
+      els.rankingSearch.addEventListener(eventName, () => window.setTimeout(renderCandidates, 0));
+    });
     els.monthRangeButtons.addEventListener("click", event => {
       const button = event.target.closest("button[data-min-months]");
       if (!button) return;
@@ -2825,9 +2856,16 @@
       }
     });
     els.backTop.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
-    window.addEventListener("scroll", () => {
-      els.backTop.classList.toggle("visible", window.scrollY > 420);
+    els.backBottom.addEventListener("click", () => {
+      document.querySelector("#turnForm")?.scrollIntoView({ behavior: "smooth", block: "start" });
     });
+    function updateFloatingButtons() {
+      const newTurnActive = document.querySelector("#newTurnView").classList.contains("active");
+      const nearBottom = window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 180;
+      els.backTop.classList.toggle("visible", window.scrollY > 420);
+      els.backBottom.classList.toggle("visible", newTurnActive && !nearBottom);
+    }
+    window.addEventListener("scroll", updateFloatingButtons);
     document.querySelectorAll("nav button").forEach(button => {
       button.addEventListener("click", () => showView(button.dataset.view));
     });
