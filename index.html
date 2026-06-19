@@ -2647,6 +2647,10 @@
       const twelveMonthsAgo = new Date(turnDate.getFullYear(), turnDate.getMonth() - 12, 1);
       const warnings = [];
 
+      if (existingTurns.some(item => parseDate(item.date) >= twelveMonthsAgo && parseDate(item.date) <= turnDate)) {
+        return ["Este abogado(a) tuvo turno dentro de los últimos 12 meses."];
+      }
+
       if (existingTurns.some(item => String(item.date).slice(0, 7) === turnMonth)) {
         warnings.push("Este abogado(a) ya tiene un turno registrado en el mismo mes.");
       }
@@ -2656,10 +2660,6 @@
       if (existingTurns.some(item => item.court === turn.court)) {
         warnings.push("Este abogado(a) ya registra turnos en el mismo tribunal.");
       }
-      if (existingTurns.some(item => parseDate(item.date) >= twelveMonthsAgo && parseDate(item.date) <= turnDate)) {
-        warnings.push("Este abogado(a) tuvo turno dentro de los últimos 12 meses.");
-      }
-
       return [...new Set(warnings)];
     }
 
@@ -2677,7 +2677,7 @@
         </div>
         ${warnings.length ? `
           <div class="info-box">
-            <span>Advertencias de duplicado</span>
+            <span>Advertencia de asignación</span>
             <ul class="warning-list">${warnings.map(item => `<li>${escapeHtml(item)}</li>`).join("")}</ul>
           </div>
         ` : `<div class="info-box"><span>Validación</span><strong>Sin duplicados relevantes detectados.</strong></div>`}
