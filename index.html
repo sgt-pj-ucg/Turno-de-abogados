@@ -1329,8 +1329,8 @@
         </div>
         <div class="field" id="disableOtherWrap" hidden>
           <label for="disableOtherReason">Detalle de la razón</label>
-          <input id="disableOtherReason" maxlength="120" placeholder="Frase corta, máximo 120 caracteres">
-          <p class="field-help"><span id="disableOtherCounter">0</span>/120 caracteres.</p>
+          <input id="disableOtherReason" maxlength="100" placeholder="Frase corta, máximo 100 caracteres">
+          <p class="field-help"><span id="disableOtherCounter">0</span>/100 caracteres.</p>
         </div>
         <div class="field">
           <label for="disableDocumentFile">Documento de respaldo</label>
@@ -1353,8 +1353,8 @@
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxv8C83sfBPIJewLDjnTqNDcACIhtMbcS5ReMDzZI0NK1jTQUjiHkaIID4EzvJZuCdn/exec";
     const APP_VERSION = "1";
-    const REQUIRED_SCRIPT_VERSION = "2026-06-20-disable-upload-v2";
-    const DISABLE_DETAIL_MAX_LENGTH = 120;
+    const REQUIRED_SCRIPT_VERSION = "2026-06-20-disable-upload-v3";
+    const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
 
     const seedTurns = [
@@ -2568,21 +2568,21 @@
       };
 
       if (payload.fileData) {
+        const body = new URLSearchParams({
+          action: "setenabled",
+          payload: JSON.stringify(payload)
+        });
         return fetch(GOOGLE_APPS_SCRIPT_URL, {
           method: "POST",
           mode: "no-cors",
-          body: (() => {
-            const form = new FormData();
-            form.append("action", "setenabled");
-            form.append("payload", JSON.stringify(payload));
-            return form;
-          })()
+          headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
+          body
         }).then(() => new Promise(resolve => {
           window.setTimeout(() => resolve({
             ok: true,
             updated: 1,
-            message: "Solicitud enviada al Apps Script. El documento se cargará en Drive."
-          }), 3500);
+            message: "Solicitud enviada al Apps Script. El documento se cargó en Drive y la planilla fue actualizada."
+          }), 12000);
         })).catch(() => ({
           ok: false,
           updated: 0,
