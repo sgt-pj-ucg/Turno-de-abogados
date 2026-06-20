@@ -1351,10 +1351,10 @@
 
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
-    const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxv8C83sfBPIJewLDjnTqNDcACIhtMbcS5ReMDzZI0NK1jTQUjiHkaIID4EzvJZuCdn/exec";
+    const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwwv7u6LiwBejpm9x6CUwD7IFjvhZ6bShyb0dDnv0L-4un66SMKxnATRg3_oTgTKQ5h/exec";
     const APP_VERSION = "1";
-    const REQUIRED_SCRIPT_VERSION = "2026-06-20-disable-upload-v2";
-    const ACCEPTED_SCRIPT_VERSIONS = ["2026-06-20-disable-upload-v2", "2026-06-20-disable-upload-v3"];
+    const REQUIRED_SCRIPT_VERSION = "2026-06-20-disable-upload-v4";
+    const ACCEPTED_SCRIPT_VERSIONS = ["2026-06-20-disable-upload-v2", "2026-06-20-disable-upload-v3", "2026-06-20-disable-upload-v4"];
     const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
 
@@ -2816,6 +2816,10 @@
       }
 
       showToast(`Habilitación actualizada: ${profile.name} quedó en ${enabledValue}.`);
+      if (evidence?.fileData) {
+        showToast("Cambio enviado con documento adjunto. Espera unos segundos antes de sincronizar para que Drive termine el respaldo.");
+        return;
+      }
       syncFromSheet({ keepSelected: true }).catch(() => showToast("Cambio guardado; no se pudo refrescar la planilla en este momento."));
     }
 
