@@ -1018,6 +1018,25 @@
       border-top: 1px solid var(--line);
     }
 
+    .modal-note {
+      margin: 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
+    }
+
+    .document-row {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) 210px;
+      gap: 10px;
+      align-items: end;
+    }
+
+    .support-folder {
+      min-height: 40px;
+      text-decoration: none;
+    }
+
     .warning-list {
       margin: 0;
       padding-left: 20px;
@@ -1046,7 +1065,7 @@
       .actions { justify-content: stretch; }
       .actions .btn { flex: 1; }
       .contact-toolbar { align-items: flex-start; flex-direction: column; }
-      .metrics, .contact-grid, .summary-grid, .form-grid, .rank-controls, .alert-grid, .alert-edit-grid { grid-template-columns: 1fr; }
+      .metrics, .contact-grid, .summary-grid, .form-grid, .rank-controls, .alert-grid, .alert-edit-grid, .document-row { grid-template-columns: 1fr; }
       .rank-search { grid-column: span 1; }
       .alert-edit-grid .btn { min-height: 48px; }
       .panel-header { align-items: flex-start; flex-direction: column; }
@@ -1292,15 +1311,52 @@
     </div>
   </div>
 
+  <div class="modal-backdrop" id="disableModal" role="dialog" aria-modal="true" aria-labelledby="disableTitle">
+    <div class="modal">
+      <header><h3 id="disableTitle">Justificar no habilitación</h3></header>
+      <div class="modal-body">
+        <p class="modal-note">
+          Se dejará al abogado(a) <strong id="disableLawyerName"></strong> como no habilitado para turno.
+          Debes seleccionar una razón y registrar el enlace del documento de respaldo.
+        </p>
+        <div class="field">
+          <label for="disableReasonSelect">Razón</label>
+          <select id="disableReasonSelect">
+            <option value="No vive en la región de Coquimbo">No vive en la región de Coquimbo</option>
+            <option value="Trabaja en otro Servicio Público">Trabaja en otro Servicio Público</option>
+            <option value="Otro">Otro</option>
+          </select>
+        </div>
+        <div class="field" id="disableOtherWrap" hidden>
+          <label for="disableOtherReason">Detalle de la razón</label>
+          <textarea id="disableOtherReason" placeholder="Indica brevemente la razón que justifica la no habilitación."></textarea>
+        </div>
+        <div class="document-row">
+          <div class="field">
+            <label for="disableDocumentUrl">Enlace del documento de respaldo</label>
+            <input id="disableDocumentUrl" type="url" placeholder="https://..." autocomplete="off">
+            <p class="field-help">Primero sube el archivo a la carpeta Drive y luego pega aquí el enlace compartido del documento.</p>
+          </div>
+          <a class="btn support-folder" id="openSupportFolder" href="#" target="_blank" rel="noopener">Abrir carpeta Drive</a>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="cancelDisable" type="button">Cancelar</button>
+        <button class="btn primary" id="acceptDisable" type="button">Confirmar no habilitación</button>
+      </div>
+    </div>
+  </div>
+
   <button class="back-top" id="backTop" type="button">Arriba</button>
   <button class="back-top back-bottom" id="backBottom" type="button">Abajo</button>
   <div class="toast" id="toast" role="status" aria-live="polite"></div>
 
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
-    const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxO3QZAJlmp-HmIIyhltXH_m90rg5yCu1tkQI3M94ZHBXQm6M1vCOGEMSDPineTTATs/exec";
+    const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyrDinpqdpJzGhN7PD8B9CaFsOWZ9n2-n_f5VnaIF-PcJcKliJJ6Fu5r9Yonowk_5Xo/exec";
     const APP_VERSION = "1";
-    const REQUIRED_SCRIPT_VERSION = "2026-06-17-audit-log-v6";
+    const REQUIRED_SCRIPT_VERSION = "2026-06-20-disable-evidence-v1";
+    const SUPPORT_DOCUMENTS_FOLDER_URL = "https://drive.google.com/drive/folders/1Zj-oL8KgKJuvtFBNs6W4tG76NtD30FFT?usp=sharing";
 
     const seedTurns = [
       { name: "Carolina Reyes M.", id: "12.345.678-9", address: "Monjitas 527, Santiago", phone: "+56 9 1111 2222", email: "carolina@example.cl", court: "1° Juzgado Civil", subject: "Civil", date: "2026-01-01", year: "2026", month: "Enero", status: "Cumplido", notes: "Dato de ejemplo" },
@@ -1316,6 +1372,7 @@
     let scriptVersionOk = null;
     let publishedScriptVersion = "";
     let historySort = { key: "date", direction: "desc" };
+    let pendingDisableResolver = null;
     const selectedProposalKeys = new Set();
 
     const els = {
@@ -1342,6 +1399,15 @@
       confirmBody: document.querySelector("#confirmBody"),
       cancelConfirm: document.querySelector("#cancelConfirm"),
       acceptConfirm: document.querySelector("#acceptConfirm"),
+      disableModal: document.querySelector("#disableModal"),
+      disableLawyerName: document.querySelector("#disableLawyerName"),
+      disableReasonSelect: document.querySelector("#disableReasonSelect"),
+      disableOtherWrap: document.querySelector("#disableOtherWrap"),
+      disableOtherReason: document.querySelector("#disableOtherReason"),
+      disableDocumentUrl: document.querySelector("#disableDocumentUrl"),
+      openSupportFolder: document.querySelector("#openSupportFolder"),
+      cancelDisable: document.querySelector("#cancelDisable"),
+      acceptDisable: document.querySelector("#acceptDisable"),
       lastSaveStatus: document.querySelector("#lastSaveStatus"),
       backTop: document.querySelector("#backTop"),
       backBottom: document.querySelector("#backBottom"),
@@ -1432,13 +1498,51 @@
       return true;
     }
 
-    function promptDisableReason(profile) {
-      const reason = window.prompt(
-        `Motivo para deshabilitar a ${profile.name}:\n\n` +
-        "Ejemplos: fuera de región, no acepta turnos, datos no vigentes, suspendido/no disponible."
-      );
-      if (reason === null) return "";
-      return reason.trim();
+    function requestDisableEvidence(profile) {
+      return new Promise(resolve => {
+        if (pendingDisableResolver) pendingDisableResolver(null);
+        pendingDisableResolver = resolve;
+        els.disableLawyerName.textContent = profile.name;
+        els.disableReasonSelect.value = "No vive en la región de Coquimbo";
+        els.disableOtherWrap.hidden = true;
+        els.disableOtherReason.value = "";
+        els.disableDocumentUrl.value = "";
+        els.openSupportFolder.href = SUPPORT_DOCUMENTS_FOLDER_URL;
+        els.disableModal.classList.add("visible");
+        window.setTimeout(() => els.disableReasonSelect.focus(), 0);
+      });
+    }
+
+    function closeDisableModal(result = null) {
+      els.disableModal.classList.remove("visible");
+      const resolver = pendingDisableResolver;
+      pendingDisableResolver = null;
+      if (resolver) resolver(result);
+    }
+
+    function readDisableEvidence() {
+      const reasonValue = els.disableReasonSelect.value;
+      const otherReason = els.disableOtherReason.value.trim();
+      const documentUrl = els.disableDocumentUrl.value.trim();
+      const reason = reasonValue === "Otro" ? otherReason : reasonValue;
+
+      if (!reason) {
+        showToast("Selecciona o escribe la razón de la no habilitación.");
+        if (reasonValue === "Otro") els.disableOtherReason.focus();
+        else els.disableReasonSelect.focus();
+        return null;
+      }
+      if (!/^https:\/\/.+/i.test(documentUrl)) {
+        showToast("Pega el enlace del documento de respaldo antes de confirmar.");
+        els.disableDocumentUrl.focus();
+        return null;
+      }
+
+      return {
+        reason,
+        documentUrl,
+        combinedReason: `${reason} | Respaldo documental: ${documentUrl}`
+      };
     }
 
     function sortedHistory(turnsList) {
@@ -1529,6 +1633,7 @@
         profile.lastTurn = profile.turns[0];
         profile.active = isActiveValue(profile.lastTurn?.active);
         profile.disableReason = profile.lastTurn?.disableReason || profile.turns.find(turn => hasData(turn.disableReason))?.disableReason || "";
+        profile.disableDocumentUrl = profile.lastTurn?.disableDocumentUrl || profile.turns.find(turn => hasData(turn.disableDocumentUrl))?.disableDocumentUrl || "";
         profile.monthsWithoutTurn = monthsSince(profile.lastTurn?.date);
         profile.nameSearchText = normalize([
           profile.name,
@@ -1652,6 +1757,7 @@
             </div>
             <small>Este estado controla si aparece o no en el ranking de nuevo turno.</small>
             ${!profile.active && profile.disableReason ? `<small><strong>Motivo:</strong> ${escapeHtml(profile.disableReason)}</small>` : ""}
+            ${!profile.active && profile.disableDocumentUrl ? `<small><strong>Respaldo:</strong> <a href="${escapeHtml(profile.disableDocumentUrl)}" target="_blank" rel="noopener">Ver documento</a></small>` : ""}
           </div>
         </div>
         <div class="contact-toolbar">
@@ -1822,6 +1928,7 @@
               <span class="badge red">No habilitado</span>
             </div>
             ${profile.disableReason ? `<p class="muted"><strong>Motivo:</strong> ${escapeHtml(profile.disableReason)}</p>` : ""}
+            ${profile.disableDocumentUrl ? `<p class="muted"><strong>Respaldo:</strong> <a href="${escapeHtml(profile.disableDocumentUrl)}" target="_blank" rel="noopener">Ver documento</a></p>` : ""}
             <div class="alert-edit-grid">
               <div class="info-box"><span>Correo</span><strong>${displayValue(profile.email)}</strong></div>
               <div class="info-box"><span>Teléfono</span><strong>${displayValue(profile.phone)}</strong></div>
@@ -2197,6 +2304,7 @@
           status: pick("estado registro", "estado") || "Programado",
           active: pick("habilitado turno", "activo para procesamiento", "activo") || "Sí",
           disableReason: pick("motivo inhabilitacion", "motivo inhabilitación", "motivo no habilitado"),
+          disableDocumentUrl: pick("documento respaldo inhabilitacion", "documento respaldo inhabilitación", "respaldo inhabilitacion", "respaldo inhabilitación"),
           notes: pick("observaciones", "documento fuente")
         };
       }).filter(turn => turn.name && turn.date);
@@ -2408,8 +2516,10 @@
       });
     }
 
-    function updateEnabledInGoogleSheet(profile, enabledValue, reason = "") {
+    function updateEnabledInGoogleSheet(profile, enabledValue, evidence = {}) {
       if (!GOOGLE_APPS_SCRIPT_URL) return Promise.resolve({ ok: false, message: "No hay Apps Script configurado." });
+      const reason = typeof evidence === "string" ? evidence : evidence.reason || "";
+      const documentUrl = typeof evidence === "object" ? evidence.documentUrl || "" : "";
       return new Promise(resolve => {
         const callbackName = `enabledSave_${Date.now()}_${Math.round(Math.random() * 100000)}`;
         const script = document.createElement("script");
@@ -2450,6 +2560,7 @@
             phone: profile.phone,
             email: profile.email,
             reason,
+            documentUrl,
             actor: currentActor()
           })
         });
@@ -2605,26 +2716,37 @@
       if (!canWriteSafely()) return;
       const currentValue = profile.active ? "Sí" : "No";
       if (currentValue === enabledValue) return;
-      const disableReason = enabledValue === "No" ? promptDisableReason(profile) : "";
-      if (enabledValue === "No" && !disableReason) {
-        showToast("Para deshabilitar, debes indicar un motivo.");
+      const evidence = enabledValue === "No" ? await requestDisableEvidence(profile) : { reason: "", documentUrl: "" };
+      if (enabledValue === "No" && !evidence) {
+        showToast("Cambio cancelado.");
         return;
       }
       const confirmed = window.confirm(
         `¿Cambiar habilitación de ${profile.name} a "${enabledValue}"?\n\n` +
-        (disableReason ? `Motivo: ${disableReason}\n\n` : "") +
+        (evidence?.reason ? `Motivo: ${evidence.reason}\n` : "") +
+        (evidence?.documentUrl ? `Documento: ${evidence.documentUrl}\n\n` : "") +
         "Esto actualizará la columna Habilitado Turno en Google Sheets y afectará el ranking."
       );
       if (!confirmed) return;
 
       els.lawyerDetail.querySelectorAll("[data-enabled-value]").forEach(button => button.disabled = true);
-      turns = turns.map(turn => personKey(turn) === key ? { ...turn, active: enabledValue, disableReason: enabledValue === "No" ? disableReason : "" } : turn);
+      turns = turns.map(turn => personKey(turn) === key ? {
+        ...turn,
+        active: enabledValue,
+        disableReason: enabledValue === "No" ? evidence.reason : "",
+        disableDocumentUrl: enabledValue === "No" ? evidence.documentUrl : ""
+      } : turn);
       renderAll();
       renderLawyerDetail(groupLawyers().find(item => item.key === key));
       showToast("Cambio aplicado en pantalla. Sincronizando con Google Sheets...");
-      const result = await updateEnabledInGoogleSheet(profile, enabledValue, disableReason);
+      const result = await updateEnabledInGoogleSheet(profile, enabledValue, evidence);
       if (!result.ok || !result.updated) {
-        turns = turns.map(turn => personKey(turn) === key ? { ...turn, active: currentValue, disableReason: profile.disableReason || "" } : turn);
+        turns = turns.map(turn => personKey(turn) === key ? {
+          ...turn,
+          active: currentValue,
+          disableReason: profile.disableReason || "",
+          disableDocumentUrl: profile.disableDocumentUrl || ""
+        } : turn);
         renderAll();
         renderLawyerDetail(groupLawyers().find(item => item.key === key));
         showToast(result.message || "No se pudo actualizar la planilla. Revisa que el Apps Script esté actualizado y desplegado.");
@@ -2883,6 +3005,19 @@
         pendingTurn = null;
         closeConfirmModal();
       }
+    });
+    els.disableReasonSelect.addEventListener("change", () => {
+      const needsDetail = els.disableReasonSelect.value === "Otro";
+      els.disableOtherWrap.hidden = !needsDetail;
+      if (needsDetail) els.disableOtherReason.focus();
+    });
+    els.cancelDisable.addEventListener("click", () => closeDisableModal(null));
+    els.acceptDisable.addEventListener("click", () => {
+      const evidence = readDisableEvidence();
+      if (evidence) closeDisableModal(evidence);
+    });
+    els.disableModal.addEventListener("click", event => {
+      if (event.target === els.disableModal) closeDisableModal(null);
     });
     els.backTop.addEventListener("click", () => window.scrollTo({ top: 0, behavior: "smooth" }));
     els.backBottom.addEventListener("click", () => {
