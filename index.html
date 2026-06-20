@@ -1335,7 +1335,7 @@
         <div class="field">
           <label for="disableDocumentFile">Documento de respaldo</label>
           <input id="disableDocumentFile" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
-          <p class="field-help">El archivo se cargará en Drive mediante Apps Script, en una carpeta con el nombre del abogado(a). Máximo 8 MB.</p>
+          <p class="field-help">El archivo se cargará en Drive con el nombre del abogado(a), fecha y nombre original. Máximo 8 MB.</p>
         </div>
       </div>
       <div class="modal-actions">
@@ -1351,10 +1351,13 @@
 
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
-    const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzoIrBIBqKPQMZ-3ATuMjYxufCbyfF_DKCnvg8zHMi3WUGf6duUYHtflHQ5Lmc-p2u3/exec";
+    const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzQijQ7a0grUabTHFwY3YmtPFsPU3rXWvbWMAcy-E8RsG4zgFD1JWkEZD8-YW0k1tFn/exec";
     const APP_VERSION = "1";
-    const REQUIRED_SCRIPT_VERSION = "2026-06-20-disable-upload-v5";
-    const ACCEPTED_SCRIPT_VERSIONS = ["2026-06-20-disable-upload-v2", "2026-06-20-disable-upload-v3", "2026-06-20-disable-upload-v4", "2026-06-20-disable-upload-v5"];
+    const REQUIRED_SCRIPT_VERSION = "2026-06-20-disable-upload-v8-drive-root-file";
+    const ACCEPTED_SCRIPT_VERSIONS = [
+      "2026-06-20-disable-upload-v7-drive-write-auth",
+      "2026-06-20-disable-upload-v8-drive-root-file"
+    ];
     const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
 
