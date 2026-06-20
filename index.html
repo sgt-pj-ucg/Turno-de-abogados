@@ -1317,7 +1317,7 @@
       <div class="modal-body">
         <p class="modal-note">
           Se dejará al abogado(a) <strong id="disableLawyerName"></strong> como no habilitado para turno.
-          Debes seleccionar una razón y registrar el enlace del documento de respaldo.
+          Debes seleccionar una razón y adjuntar el documento que la respalda.
         </p>
         <div class="field">
           <label for="disableReasonSelect">Razón</label>
@@ -1329,15 +1329,13 @@
         </div>
         <div class="field" id="disableOtherWrap" hidden>
           <label for="disableOtherReason">Detalle de la razón</label>
-          <textarea id="disableOtherReason" placeholder="Indica brevemente la razón que justifica la no habilitación."></textarea>
+          <input id="disableOtherReason" maxlength="120" placeholder="Frase corta, máximo 120 caracteres">
+          <p class="field-help"><span id="disableOtherCounter">0</span>/120 caracteres.</p>
         </div>
-        <div class="document-row">
-          <div class="field">
-            <label for="disableDocumentUrl">Enlace del documento de respaldo</label>
-            <input id="disableDocumentUrl" type="url" placeholder="https://..." autocomplete="off">
-            <p class="field-help">Primero sube el archivo a la carpeta Drive y luego pega aquí el enlace compartido del documento.</p>
-          </div>
-          <a class="btn support-folder" id="openSupportFolder" href="#" target="_blank" rel="noopener">Abrir carpeta Drive</a>
+        <div class="field">
+          <label for="disableDocumentFile">Documento de respaldo</label>
+          <input id="disableDocumentFile" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
+          <p class="field-help">El archivo se cargará en Drive mediante Apps Script, en una carpeta con el nombre del abogado(a). Máximo 8 MB.</p>
         </div>
       </div>
       <div class="modal-actions">
@@ -1355,8 +1353,9 @@
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyrDinpqdpJzGhN7PD8B9CaFsOWZ9n2-n_f5VnaIF-PcJcKliJJ6Fu5r9Yonowk_5Xo/exec";
     const APP_VERSION = "1";
-    const REQUIRED_SCRIPT_VERSION = "2026-06-20-disable-evidence-v1";
-    const SUPPORT_DOCUMENTS_FOLDER_URL = "https://drive.google.com/drive/folders/1Zj-oL8KgKJuvtFBNs6W4tG76NtD30FFT?usp=sharing";
+    const REQUIRED_SCRIPT_VERSION = "2026-06-20-disable-upload-v2";
+    const DISABLE_DETAIL_MAX_LENGTH = 120;
+    const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
 
     const seedTurns = [
       { name: "Carolina Reyes M.", id: "12.345.678-9", address: "Monjitas 527, Santiago", phone: "+56 9 1111 2222", email: "carolina@example.cl", court: "1° Juzgado Civil", subject: "Civil", date: "2026-01-01", year: "2026", month: "Enero", status: "Cumplido", notes: "Dato de ejemplo" },
@@ -1404,8 +1403,8 @@
       disableReasonSelect: document.querySelector("#disableReasonSelect"),
       disableOtherWrap: document.querySelector("#disableOtherWrap"),
       disableOtherReason: document.querySelector("#disableOtherReason"),
-      disableDocumentUrl: document.querySelector("#disableDocumentUrl"),
-      openSupportFolder: document.querySelector("#openSupportFolder"),
+      disableOtherCounter: document.querySelector("#disableOtherCounter"),
+      disableDocumentFile: document.querySelector("#disableDocumentFile"),
       cancelDisable: document.querySelector("#cancelDisable"),
       acceptDisable: document.querySelector("#acceptDisable"),
       lastSaveStatus: document.querySelector("#lastSaveStatus"),
@@ -1506,8 +1505,8 @@
         els.disableReasonSelect.value = "No vive en la región de Coquimbo";
         els.disableOtherWrap.hidden = true;
         els.disableOtherReason.value = "";
-        els.disableDocumentUrl.value = "";
-        els.openSupportFolder.href = SUPPORT_DOCUMENTS_FOLDER_URL;
+        els.disableOtherCounter.textContent = "0";
+        els.disableDocumentFile.value = "";
         els.disableModal.classList.add("visible");
         window.setTimeout(() => els.disableReasonSelect.focus(), 0);
       });
@@ -1520,11 +1519,28 @@
       if (resolver) resolver(result);
     }
 
-    function readDisableEvidence() {
+    function fileToEvidencePayload(file) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => {
+          const dataUrl = String(reader.result || "");
+          const base64 = dataUrl.includes(",") ? dataUrl.split(",").pop() : dataUrl;
+          resolve({
+            fileName: file.name,
+            mimeType: file.type || "application/octet-stream",
+            fileData: base64
+          });
+        };
+        reader.onerror = () => reject(new Error("No se pudo leer el archivo seleccionado."));
+        reader.readAsDataURL(file);
+      });
+    }
+
+    async function readDisableEvidence() {
       const reasonValue = els.disableReasonSelect.value;
       const otherReason = els.disableOtherReason.value.trim();
-      const documentUrl = els.disableDocumentUrl.value.trim();
       const reason = reasonValue === "Otro" ? otherReason : reasonValue;
+      const file = els.disableDocumentFile.files?.[0];
 
       if (!reason) {
         showToast("Selecciona o escribe la razón de la no habilitación.");
@@ -1532,16 +1548,33 @@
         else els.disableReasonSelect.focus();
         return null;
       }
-      if (!/^https:\/\/.+/i.test(documentUrl)) {
-        showToast("Pega el enlace del documento de respaldo antes de confirmar.");
-        els.disableDocumentUrl.focus();
+      if (reason.length > DISABLE_DETAIL_MAX_LENGTH) {
+        showToast(`El detalle no puede superar ${DISABLE_DETAIL_MAX_LENGTH} caracteres.`);
+        els.disableOtherReason.focus();
+        return null;
+      }
+      if (!file) {
+        showToast("Adjunta el documento de respaldo antes de confirmar.");
+        els.disableDocumentFile.focus();
+        return null;
+      }
+      if (file.size > DISABLE_FILE_MAX_BYTES) {
+        showToast("El documento supera 8 MB. Usa un archivo más liviano.");
+        els.disableDocumentFile.focus();
         return null;
       }
 
+      const filePayload = await fileToEvidencePayload(file).catch(error => {
+        showToast(error.message || "No se pudo preparar el archivo.");
+        return null;
+      });
+      if (!filePayload) return null;
+
       return {
         reason,
-        documentUrl,
-        combinedReason: `${reason} | Respaldo documental: ${documentUrl}`
+        documentUrl: "",
+        combinedReason: `${reason} | Respaldo documental adjunto`,
+        ...filePayload
       };
     }
 
@@ -2520,6 +2553,43 @@
       if (!GOOGLE_APPS_SCRIPT_URL) return Promise.resolve({ ok: false, message: "No hay Apps Script configurado." });
       const reason = typeof evidence === "string" ? evidence : evidence.reason || "";
       const documentUrl = typeof evidence === "object" ? evidence.documentUrl || "" : "";
+      const payload = {
+        enabled: enabledValue,
+        key: profile.key,
+        name: profile.name,
+        phone: profile.phone,
+        email: profile.email,
+        reason,
+        documentUrl,
+        fileName: typeof evidence === "object" ? evidence.fileName || "" : "",
+        mimeType: typeof evidence === "object" ? evidence.mimeType || "" : "",
+        fileData: typeof evidence === "object" ? evidence.fileData || "" : "",
+        actor: currentActor()
+      };
+
+      if (payload.fileData) {
+        return fetch(GOOGLE_APPS_SCRIPT_URL, {
+          method: "POST",
+          mode: "no-cors",
+          body: (() => {
+            const form = new FormData();
+            form.append("action", "setenabled");
+            form.append("payload", JSON.stringify(payload));
+            return form;
+          })()
+        }).then(() => new Promise(resolve => {
+          window.setTimeout(() => resolve({
+            ok: true,
+            updated: 1,
+            message: "Solicitud enviada al Apps Script. El documento se cargará en Drive."
+          }), 3500);
+        })).catch(() => ({
+          ok: false,
+          updated: 0,
+          message: "No se pudo enviar el archivo al Apps Script."
+        }));
+      }
+
       return new Promise(resolve => {
         const callbackName = `enabledSave_${Date.now()}_${Math.round(Math.random() * 100000)}`;
         const script = document.createElement("script");
@@ -2553,16 +2623,7 @@
         const params = new URLSearchParams({
           action: "setenabled",
           callback: callbackName,
-          payload: JSON.stringify({
-            enabled: enabledValue,
-            key: profile.key,
-            name: profile.name,
-            phone: profile.phone,
-            email: profile.email,
-            reason,
-            documentUrl,
-            actor: currentActor()
-          })
+          payload: JSON.stringify(payload)
         });
         script.src = `${GOOGLE_APPS_SCRIPT_URL}?${params.toString()}`;
         document.head.appendChild(script);
@@ -2724,7 +2785,7 @@
       const confirmed = window.confirm(
         `¿Cambiar habilitación de ${profile.name} a "${enabledValue}"?\n\n` +
         (evidence?.reason ? `Motivo: ${evidence.reason}\n` : "") +
-        (evidence?.documentUrl ? `Documento: ${evidence.documentUrl}\n\n` : "") +
+        (evidence?.fileName ? `Documento adjunto: ${evidence.fileName}\n\n` : evidence?.documentUrl ? `Documento: ${evidence.documentUrl}\n\n` : "") +
         "Esto actualizará la columna Habilitado Turno en Google Sheets y afectará el ranking."
       );
       if (!confirmed) return;
@@ -3011,9 +3072,16 @@
       els.disableOtherWrap.hidden = !needsDetail;
       if (needsDetail) els.disableOtherReason.focus();
     });
+    els.disableOtherReason.addEventListener("input", () => {
+      els.disableOtherCounter.textContent = String(els.disableOtherReason.value.length);
+    });
     els.cancelDisable.addEventListener("click", () => closeDisableModal(null));
-    els.acceptDisable.addEventListener("click", () => {
-      const evidence = readDisableEvidence();
+    els.acceptDisable.addEventListener("click", async () => {
+      els.acceptDisable.disabled = true;
+      els.acceptDisable.textContent = "Preparando...";
+      const evidence = await readDisableEvidence();
+      els.acceptDisable.disabled = false;
+      els.acceptDisable.textContent = "Confirmar no habilitación";
       if (evidence) closeDisableModal(evidence);
     });
     els.disableModal.addEventListener("click", event => {
