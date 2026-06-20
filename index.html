@@ -1351,10 +1351,10 @@
 
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
-    const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwwv7u6LiwBejpm9x6CUwD7IFjvhZ6bShyb0dDnv0L-4un66SMKxnATRg3_oTgTKQ5h/exec";
+    const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzoIrBIBqKPQMZ-3ATuMjYxufCbyfF_DKCnvg8zHMi3WUGf6duUYHtflHQ5Lmc-p2u3/exec";
     const APP_VERSION = "1";
-    const REQUIRED_SCRIPT_VERSION = "2026-06-20-disable-upload-v4";
-    const ACCEPTED_SCRIPT_VERSIONS = ["2026-06-20-disable-upload-v2", "2026-06-20-disable-upload-v3", "2026-06-20-disable-upload-v4"];
+    const REQUIRED_SCRIPT_VERSION = "2026-06-20-disable-upload-v5";
+    const ACCEPTED_SCRIPT_VERSIONS = ["2026-06-20-disable-upload-v2", "2026-06-20-disable-upload-v3", "2026-06-20-disable-upload-v4", "2026-06-20-disable-upload-v5"];
     const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
 
@@ -2550,6 +2550,48 @@
       });
     }
 
+    function postToAppsScriptForm(action, payload) {
+      return new Promise(resolve => {
+        const frameName = `appsPost_${Date.now()}_${Math.round(Math.random() * 100000)}`;
+        const iframe = document.createElement("iframe");
+        const form = document.createElement("form");
+        const actionInput = document.createElement("input");
+        const payloadInput = document.createElement("textarea");
+        let resolved = false;
+
+        function finish() {
+          if (resolved) return;
+          resolved = true;
+          window.setTimeout(() => {
+            iframe.remove();
+            form.remove();
+          }, 1000);
+          resolve({ ok: true, updated: 1, message: "Solicitud enviada al Apps Script." });
+        }
+
+        iframe.name = frameName;
+        iframe.style.display = "none";
+        iframe.addEventListener("load", () => window.setTimeout(finish, 500));
+
+        form.method = "POST";
+        form.action = GOOGLE_APPS_SCRIPT_URL;
+        form.target = frameName;
+        form.style.display = "none";
+
+        actionInput.type = "hidden";
+        actionInput.name = "action";
+        actionInput.value = action;
+
+        payloadInput.name = "payload";
+        payloadInput.value = JSON.stringify(payload);
+
+        form.append(actionInput, payloadInput);
+        document.body.append(iframe, form);
+        form.submit();
+        window.setTimeout(finish, 18000);
+      });
+    }
+
     function updateEnabledInGoogleSheet(profile, enabledValue, evidence = {}) {
       if (!GOOGLE_APPS_SCRIPT_URL) return Promise.resolve({ ok: false, message: "No hay Apps Script configurado." });
       const reason = typeof evidence === "string" ? evidence : evidence.reason || "";
@@ -2569,26 +2611,7 @@
       };
 
       if (payload.fileData) {
-        const body = new URLSearchParams({
-          action: "setenabled",
-          payload: JSON.stringify(payload)
-        });
-        return fetch(GOOGLE_APPS_SCRIPT_URL, {
-          method: "POST",
-          mode: "no-cors",
-          headers: { "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8" },
-          body
-        }).then(() => new Promise(resolve => {
-          window.setTimeout(() => resolve({
-            ok: true,
-            updated: 1,
-            message: "Solicitud enviada al Apps Script. El documento se cargó en Drive y la planilla fue actualizada."
-          }), 12000);
-        })).catch(() => ({
-          ok: false,
-          updated: 0,
-          message: "No se pudo enviar el archivo al Apps Script."
-        }));
+        return postToAppsScriptForm("setenabled", payload);
       }
 
       return new Promise(resolve => {
@@ -2817,7 +2840,10 @@
 
       showToast(`Habilitación actualizada: ${profile.name} quedó en ${enabledValue}.`);
       if (evidence?.fileData) {
-        showToast("Cambio enviado con documento adjunto. Espera unos segundos antes de sincronizar para que Drive termine el respaldo.");
+        showToast("Cambio enviado con documento adjunto. Sincronizaré en unos segundos para confirmar la planilla.");
+        window.setTimeout(() => {
+          syncFromSheet({ keepSelected: true }).catch(() => showToast("Cambio enviado; no se pudo refrescar la planilla en este momento."));
+        }, 22000);
         return;
       }
       syncFromSheet({ keepSelected: true }).catch(() => showToast("Cambio guardado; no se pudo refrescar la planilla en este momento."));
