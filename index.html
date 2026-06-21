@@ -1391,10 +1391,11 @@
                   <label for="statusInput">Estado</label>
                   <select id="statusInput">
                     <option>Programado</option>
-                    <option>Original vigente</option>
-                    <option>Cumplido</option>
-                    <option>Reemplazo</option>
-                    <option>Reagendado</option>
+                    <option>Turno realizado</option>
+                    <option>Excusado</option>
+                    <option>Realizado por reemplazo</option>
+                    <option>Reemplazado</option>
+                    <option>Anulado</option>
                   </select>
                 </div>
               </div>
@@ -1905,6 +1906,29 @@
       return text !== "no" && text !== "inactivo" && !text.includes("no procesar");
     }
 
+    function statusKey(value) {
+      return normalize(value || "");
+    }
+
+    function countsAsPerformedTurn(status) {
+      const key = statusKey(status);
+      if (!key) return true;
+      if (key.includes("excus")) return false;
+      if (key.includes("reemplazad")) return false;
+      if (key.includes("anulad")) return false;
+      if (key.includes("programad")) return false;
+      if (key.includes("reagend")) return false;
+      return true;
+    }
+
+    function statusBadgeClass(status) {
+      const key = statusKey(status);
+      if (key.includes("excus") || key.includes("reemplazad") || key.includes("anulad")) return "red";
+      if (key.includes("reemplazo")) return "gold";
+      if (key.includes("programad") || key.includes("reagend")) return "blue";
+      return "green";
+    }
+
     function uniqueValues(list, key) {
       return [...new Set(list.map(item => item[key]).filter(Boolean))]
         .sort((a, b) => a.localeCompare(b, "es"));
@@ -1933,17 +1957,21 @@
       });
       return [...profiles.values()].map(profile => {
         profile.turns.sort((a, b) => parseDate(b.date) - parseDate(a.date));
+        profile.performedTurns = profile.turns.filter(turn => countsAsPerformedTurn(turn.status));
         profile.name = profile.turns[0]?.name || profile.name;
         profile.address = profile.turns[0]?.address || profile.address;
         profile.phone = profile.turns[0]?.phone || profile.phone;
         profile.email = profile.turns[0]?.email || profile.email;
-        profile.subjects = uniqueValues(profile.turns, "subject");
-        profile.courts = uniqueValues(profile.turns, "court");
-        profile.lastTurn = profile.turns[0];
-        profile.active = isActiveValue(profile.lastTurn?.active);
-        profile.disableReason = profile.lastTurn?.disableReason || profile.turns.find(turn => hasData(turn.disableReason))?.disableReason || "";
-        profile.disableDocumentUrl = profile.lastTurn?.disableDocumentUrl || profile.turns.find(turn => hasData(turn.disableDocumentUrl))?.disableDocumentUrl || "";
-        profile.monthsWithoutTurn = monthsSince(profile.lastTurn?.date);
+        profile.subjects = uniqueValues(profile.performedTurns, "subject");
+        profile.courts = uniqueValues(profile.performedTurns, "court");
+        profile.lastRecordedTurn = profile.turns[0];
+        profile.lastTurn = profile.performedTurns[0] || null;
+        profile.turnsTotal = profile.performedTurns.length;
+        profile.recordsTotal = profile.turns.length;
+        profile.active = isActiveValue(profile.lastRecordedTurn?.active);
+        profile.disableReason = profile.lastRecordedTurn?.disableReason || profile.turns.find(turn => hasData(turn.disableReason))?.disableReason || "";
+        profile.disableDocumentUrl = profile.lastRecordedTurn?.disableDocumentUrl || profile.turns.find(turn => hasData(turn.disableDocumentUrl))?.disableDocumentUrl || "";
+        profile.monthsWithoutTurn = profile.lastTurn ? monthsSince(profile.lastTurn.date) : 999;
         profile.nameSearchText = normalize([
           profile.name,
           ...profile.turns.map(turn => turn.name)
@@ -1961,7 +1989,7 @@
 
     function topSubjects(profile) {
       const counts = new Map();
-      profile.turns.forEach(turn => counts.set(turn.subject, (counts.get(turn.subject) || 0) + 1));
+      (profile.performedTurns || []).forEach(turn => counts.set(turn.subject, (counts.get(turn.subject) || 0) + 1));
       return [...counts.entries()]
         .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "es"))
         .map(([subject]) => subject)
@@ -2018,7 +2046,7 @@
         <button class="lawyer-option ${profile.key === selectedLawyerKey ? "active" : ""}" type="button" data-key="${escapeHtml(profile.key)}">
           <strong>${escapeHtml(profile.name)}</strong>
           <span class="muted">${escapeHtml(profile.email || profile.phone || "Sin contacto registrado")}</span>
-          <span class="muted">${profile.turns.length} turno${profile.turns.length === 1 ? "" : "s"} · Último: ${profile.lastTurn ? escapeHtml(profile.lastTurn.month + " " + profile.lastTurn.year) : "Sin fecha"}</span>
+          <span class="muted">${profile.turnsTotal} turno${profile.turnsTotal === 1 ? "" : "s"} realizado${profile.turnsTotal === 1 ? "" : "s"} · Último realizado: ${profile.lastTurn ? escapeHtml(profile.lastTurn.month + " " + profile.lastTurn.year) : "Sin registro"}</span>
         </button>
       `).join("");
     }
@@ -2044,16 +2072,18 @@
         els.lawyerDetail.innerHTML = "Selecciona un abogado de la lista para revisar su información.";
         return;
       }
-      els.selectedBadge.textContent = `${profile.turns.length} turnos`;
+      els.selectedBadge.textContent = `${profile.turnsTotal} turnos realizados`;
       els.lawyerDetail.className = "profile";
       const specialties = topSubjects(profile);
       const missingIssues = contactIssues(profile);
       const historyTurns = sortedHistory(profile.turns);
+      const lastTurnText = profile.lastTurn ? escapeHtml(profile.lastTurn.month + " " + profile.lastTurn.year) : "Sin turno realizado";
+      const monthsText = profile.lastTurn ? `${profile.monthsWithoutTurn} meses sin turno` : "Sin turno realizado";
       els.lawyerDetail.innerHTML = `
         <div class="profile-head">
           <div>
             <h3>${escapeHtml(profile.name)}</h3>
-            <p class="muted">${profile.monthsWithoutTurn} meses sin turno · Último turno: ${profile.lastTurn ? escapeHtml(profile.lastTurn.month + " " + profile.lastTurn.year) : "Sin registro"}</p>
+            <p class="muted">${monthsText} · Último turno realizado: ${lastTurnText}</p>
           </div>
           <div class="status-control">
             <span class="badge green">Especialidad sugerida: ${escapeHtml(specialties[0] || "Sin historial")}</span>
@@ -2107,7 +2137,7 @@
         <div class="summary-grid">
           <div class="info-box"><span>Materias históricas</span><div class="chips">${profile.subjects.map(item => `<span class="badge gold">${escapeHtml(item)}</span>`).join("")}</div></div>
           <div class="info-box"><span>Tribunales</span><strong>${escapeHtml(profile.courts.length)} registrados</strong></div>
-          <div class="info-box"><span>Total de turnos</span><strong>${profile.turns.length}</strong></div>
+          <div class="info-box"><span>Turnos realizados</span><strong>${profile.turnsTotal}</strong></div>
         </div>
         <div class="table-wrap">
           <table>
@@ -2128,7 +2158,7 @@
                   <td>${escapeHtml(turn.month)}</td>
                   <td>${escapeHtml(turn.court)}</td>
                   <td><span class="badge gold">${escapeHtml(turn.subject)}</span></td>
-                  <td>${escapeHtml(turn.status)}</td>
+                  <td><span class="badge ${statusBadgeClass(turn.status)}">${escapeHtml(turn.status)}</span></td>
                   <td>${displayValue(turn.notes)}</td>
                 </tr>
               `).join("")}
@@ -2390,10 +2420,10 @@
     }
 
     function rankingReasons(profile, subject, court) {
-      const reasons = [`${profile.monthsWithoutTurn} meses sin turno`];
+      const reasons = [profile.lastTurn ? `${profile.monthsWithoutTurn} meses sin turno` : "sin turnos realizados"];
       if (subject && profile.subjects.includes(subject)) reasons.push(`ha trabajado materia ${subject}`);
       if (court && profile.courts.includes(court)) reasons.push(`registra turnos en ${court}`);
-      if (profile.turns.length > 1) reasons.push(`${profile.turns.length} turnos históricos, con penalización por repetición`);
+      if (profile.turnsTotal > 1) reasons.push(`${profile.turnsTotal} turnos realizados, con penalización por repetición`);
       return reasons.join("; ");
     }
 
@@ -2406,7 +2436,7 @@
         const specialties = topSubjects(profile);
         const subjectAffinity = subject && profile.subjects.includes(subject) ? 8 : 0;
         const courtAffinity = court && profile.courts.includes(court) ? 4 : 0;
-        const repeatPenalty = Math.max(0, profile.turns.length - 1) * 2;
+        const repeatPenalty = Math.max(0, profile.turnsTotal - 1) * 2;
         const score = profile.monthsWithoutTurn * 3 + subjectAffinity + courtAffinity - repeatPenalty;
         return { ...profile, specialties, score };
       }).filter(profile => {
@@ -2419,7 +2449,7 @@
 
       const candidates = (ranked.length || rankingText) ? ranked : activeProfiles.map(profile => {
         const specialties = topSubjects(profile);
-        const repeatPenalty = Math.max(0, profile.turns.length - 1) * 2;
+        const repeatPenalty = Math.max(0, profile.turnsTotal - 1) * 2;
         return { ...profile, specialties, score: profile.monthsWithoutTurn * 3 - repeatPenalty };
       }).filter(profile => profile.monthsWithoutTurn >= rankingMinMonths)
         .sort((a, b) => b.score - a.score || b.monthsWithoutTurn - a.monthsWithoutTurn || a.name.localeCompare(b.name, "es"));
@@ -2443,7 +2473,7 @@
                 <input type="checkbox" class="proposal-check" data-key="${escapeHtml(candidate.key)}" ${selectedProposalKeys.has(candidate.key) ? "checked" : ""}>
                 <span>${index + 1}. ${escapeHtml(candidate.name)}</span>
               </label>
-              <p class="muted">${displayValue(candidate.email || candidate.phone)} · ${candidate.turns.length} turno${candidate.turns.length === 1 ? "" : "s"} histórico${candidate.turns.length === 1 ? "" : "s"}</p>
+              <p class="muted">${displayValue(candidate.email || candidate.phone)} · ${candidate.turnsTotal} turno${candidate.turnsTotal === 1 ? "" : "s"} realizado${candidate.turnsTotal === 1 ? "" : "s"}</p>
             </div>
             <div class="score">${candidate.monthsWithoutTurn}<span>meses sin turno</span></div>
           </div>
@@ -3134,7 +3164,7 @@
     }
 
     function duplicateWarnings(turn) {
-      const existingTurns = matchingLawyerTurns(turn);
+      const existingTurns = matchingLawyerTurns(turn).filter(item => countsAsPerformedTurn(item.status));
       const turnMonth = String(turn.date).slice(0, 7);
       const turnDate = parseDate(turn.date);
       const twelveMonthsAgo = new Date(turnDate.getFullYear(), turnDate.getMonth() - 12, 1);
