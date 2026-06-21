@@ -2021,7 +2021,8 @@
         profile.active = isActiveValue(profile.lastRecordedTurn?.active);
         profile.disableReason = profile.lastRecordedTurn?.disableReason || profile.turns.find(turn => hasData(turn.disableReason))?.disableReason || "";
         profile.disableDocumentUrl = profile.lastRecordedTurn?.disableDocumentUrl || profile.turns.find(turn => hasData(turn.disableDocumentUrl))?.disableDocumentUrl || "";
-        profile.monthsWithoutTurn = profile.lastTurn ? monthsSince(profile.lastTurn.date) : 999;
+        profile.monthsWithoutTurn = profile.lastTurn ? monthsSince(profile.lastTurn.date) : 0;
+        profile.rankingMonths = profile.lastTurn ? profile.monthsWithoutTurn : 999;
         profile.nameSearchText = normalize([
           profile.name,
           ...profile.turns.map(turn => turn.name)
@@ -2035,6 +2036,14 @@
       const now = new Date();
       const date = parseDate(dateValue);
       return Math.max(0, (now.getFullYear() - date.getFullYear()) * 12 + now.getMonth() - date.getMonth());
+    }
+
+    function monthsDisplay(profile) {
+      return profile.lastTurn ? String(profile.monthsWithoutTurn) : "Sin turno realizado";
+    }
+
+    function monthsSummary(profile) {
+      return profile.lastTurn ? `${profile.monthsWithoutTurn} meses sin turno` : "Sin turno realizado";
     }
 
     function topSubjects(profile) {
@@ -2077,7 +2086,7 @@
       return groupLawyers().filter(profile => {
         const matchesText = !text || profile.nameSearchText.includes(text);
         const matchesSubject = text ? true : (!subject || profile.subjects.includes(subject));
-        const matchesMonths = text ? true : profile.monthsWithoutTurn >= minMonths;
+        const matchesMonths = text ? true : profile.rankingMonths >= minMonths;
         const matchesActive = activeFilter === "all"
           || (activeFilter === "yes" && profile.active)
           || (activeFilter === "no" && !profile.active);
@@ -2128,7 +2137,7 @@
       const missingIssues = contactIssues(profile);
       const historyTurns = sortedHistory(profile.turns);
       const lastTurnText = profile.lastTurn ? escapeHtml(profile.lastTurn.month + " " + profile.lastTurn.year) : "Sin turno realizado";
-      const monthsText = profile.lastTurn ? `${profile.monthsWithoutTurn} meses sin turno` : "Sin turno realizado";
+      const monthsText = monthsSummary(profile);
       els.lawyerDetail.innerHTML = `
         <div class="profile-head">
           <div>
@@ -2381,7 +2390,7 @@
             ${profiles.map(profile => `
               <tr>
                 <td>${escapeHtml(profile.name)}</td>
-                <td>${profile.monthsWithoutTurn}</td>
+                <td>${escapeHtml(monthsDisplay(profile))}</td>
                 <td>${escapeHtml(profile.subjects.join(", "))}</td>
                 <td>${escapeHtml(profile.lastTurn?.court || "")}</td>
                 <td>${escapeHtml(profile.phone || "Sin teléfono")}</td>
@@ -2406,7 +2415,7 @@
         <tr>
           <td>${index + 1}</td>
           <td>${escapeHtml(profile.name)}</td>
-          <td>${profile.monthsWithoutTurn}</td>
+          <td>${escapeHtml(monthsDisplay(profile))}</td>
           <td>${escapeHtml(profile.subjects.join(", "))}</td>
           <td>${escapeHtml(profile.lastTurn?.court || "")}</td>
           <td>${escapeHtml(profile.phone || "Sin teléfono")}</td>
@@ -2470,7 +2479,7 @@
     }
 
     function rankingReasons(profile, subject, court) {
-      const reasons = [profile.lastTurn ? `${profile.monthsWithoutTurn} meses sin turno` : "sin turnos realizados"];
+      const reasons = [profile.lastTurn ? `${profile.monthsWithoutTurn} meses sin turno` : "abogado(a) nuevo(a), sin turnos realizados"];
       if (subject && profile.subjects.includes(subject)) reasons.push(`ha trabajado materia ${subject}`);
       if (court && profile.courts.includes(court)) reasons.push(`registra turnos en ${court}`);
       if (profile.turnsTotal > 1) reasons.push(`${profile.turnsTotal} turnos realizados, con penalización por repetición`);
@@ -2487,22 +2496,22 @@
         const subjectAffinity = subject && profile.subjects.includes(subject) ? 8 : 0;
         const courtAffinity = court && profile.courts.includes(court) ? 4 : 0;
         const repeatPenalty = Math.max(0, profile.turnsTotal - 1) * 2;
-        const score = profile.monthsWithoutTurn * 3 + subjectAffinity + courtAffinity - repeatPenalty;
+        const score = profile.rankingMonths * 3 + subjectAffinity + courtAffinity - repeatPenalty;
         return { ...profile, specialties, score };
       }).filter(profile => {
         const matchesSubject = !subject || profile.subjects.includes(subject);
         const matchesCourt = !court || profile.courts.includes(court);
-        const matchesMonths = profile.monthsWithoutTurn >= rankingMinMonths;
+        const matchesMonths = profile.rankingMonths >= rankingMinMonths;
         const matchesText = !rankingText || profile.nameSearchText.includes(rankingText);
         return matchesSubject && matchesCourt && matchesMonths && matchesText;
-      }).sort((a, b) => b.score - a.score || b.monthsWithoutTurn - a.monthsWithoutTurn || a.name.localeCompare(b.name, "es"));
+      }).sort((a, b) => b.score - a.score || b.rankingMonths - a.rankingMonths || a.name.localeCompare(b.name, "es"));
 
       const candidates = (ranked.length || rankingText) ? ranked : activeProfiles.map(profile => {
         const specialties = topSubjects(profile);
         const repeatPenalty = Math.max(0, profile.turnsTotal - 1) * 2;
-        return { ...profile, specialties, score: profile.monthsWithoutTurn * 3 - repeatPenalty };
-      }).filter(profile => profile.monthsWithoutTurn >= rankingMinMonths)
-        .sort((a, b) => b.score - a.score || b.monthsWithoutTurn - a.monthsWithoutTurn || a.name.localeCompare(b.name, "es"));
+        return { ...profile, specialties, score: profile.rankingMonths * 3 - repeatPenalty };
+      }).filter(profile => profile.rankingMonths >= rankingMinMonths)
+        .sort((a, b) => b.score - a.score || b.rankingMonths - a.rankingMonths || a.name.localeCompare(b.name, "es"));
 
       els.rankingSummary.textContent = ranked.length
         ? `${candidates.length} candidato${candidates.length === 1 ? "" : "s"} habilitado${candidates.length === 1 ? "" : "s"} con ${rankingMinMonths}+ meses sin turno${rankingText ? ` que coinciden con "${els.rankingSearch.value.trim()}"` : ""}${subject ? ` para materia ${subject}` : ""}${court ? ` en ${court}` : ""}.`
@@ -2525,7 +2534,7 @@
               </label>
               <p class="muted">${displayValue(candidate.email || candidate.phone)} · ${candidate.turnsTotal} turno${candidate.turnsTotal === 1 ? "" : "s"} realizado${candidate.turnsTotal === 1 ? "" : "s"}</p>
             </div>
-            <div class="score">${candidate.monthsWithoutTurn}<span>meses sin turno</span></div>
+            <div class="score">${candidate.lastTurn ? candidate.monthsWithoutTurn : "Nuevo"}<span>${candidate.lastTurn ? "meses sin turno" : "sin turno realizado"}</span></div>
           </div>
           <div class="candidate-facts">
             <span class="badge gold">Materia sugerida: ${escapeHtml(candidate.specialties[0] || subject || "Sin historial")}</span>
