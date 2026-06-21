@@ -1514,7 +1514,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyvUFFVA3F8boPwm22iPvYappWgzeRDG5qoelX5733WeN-HxQg1It79k6oMFIu7xMG4/exec";
-    const APP_VERSION = "1.2.1-excusas-reemplazo";
+    const APP_VERSION = "1.2.2-excusas-reemplazo";
     const REQUIRED_SCRIPT_VERSION = "2026-06-20-turn-status-v10";
     const ACCEPTED_SCRIPT_VERSIONS = [
       "2026-06-20-turn-status-v10"
@@ -1971,6 +1971,11 @@
       return true;
     }
 
+    function isExcuseOrReplacementStatus(status) {
+      const key = statusKey(status);
+      return key.includes("excus") || key.includes("reemplazad") || key.includes("original reemplaz");
+    }
+
     function statusBadgeClass(status) {
       const key = statusKey(status);
       if (key.includes("excus") || key.includes("reemplazad") || key.includes("anulad")) return "red";
@@ -2016,6 +2021,7 @@
         profile.courts = uniqueValues(profile.performedTurns, "court");
         profile.lastRecordedTurn = profile.turns[0];
         profile.lastTurn = profile.performedTurns[0] || null;
+        profile.excuseRecords = profile.turns.filter(turn => isExcuseOrReplacementStatus(turn.status));
         profile.turnsTotal = profile.performedTurns.length;
         profile.recordsTotal = profile.turns.length;
         profile.active = isActiveValue(profile.lastRecordedTurn?.active);
@@ -2044,6 +2050,18 @@
 
     function monthsSummary(profile) {
       return profile.lastTurn ? `${profile.monthsWithoutTurn} meses sin turno` : "Sin turno realizado";
+    }
+
+    function noPerformedLabel(profile) {
+      if (profile.lastTurn) return "";
+      if ((profile.excuseRecords || []).length) return "Solo excusas";
+      return "Sin turno";
+    }
+
+    function noPerformedCaption(profile) {
+      if (profile.lastTurn) return "meses sin turno";
+      if ((profile.excuseRecords || []).length) return "sin turno efectivo";
+      return "realizado";
     }
 
     function topSubjects(profile) {
@@ -2479,7 +2497,11 @@
     }
 
     function rankingReasons(profile, subject, court) {
-      const reasons = [profile.lastTurn ? `${profile.monthsWithoutTurn} meses sin turno` : "abogado(a) nuevo(a), sin turnos realizados"];
+      const reasons = [profile.lastTurn
+        ? `${profile.monthsWithoutTurn} meses sin turno`
+        : (profile.excuseRecords || []).length
+          ? "registra excusas o reemplazos, pero ningún turno realizado"
+          : "sin turnos realizados"];
       if (subject && profile.subjects.includes(subject)) reasons.push(`ha trabajado materia ${subject}`);
       if (court && profile.courts.includes(court)) reasons.push(`registra turnos en ${court}`);
       if (profile.turnsTotal > 1) reasons.push(`${profile.turnsTotal} turnos realizados, con penalización por repetición`);
@@ -2534,7 +2556,7 @@
               </label>
               <p class="muted">${displayValue(candidate.email || candidate.phone)} · ${candidate.turnsTotal} turno${candidate.turnsTotal === 1 ? "" : "s"} realizado${candidate.turnsTotal === 1 ? "" : "s"}</p>
             </div>
-            <div class="score">${candidate.lastTurn ? candidate.monthsWithoutTurn : "Sin turno"}<span>${candidate.lastTurn ? "meses sin turno" : "realizado"}</span></div>
+            <div class="score">${candidate.lastTurn ? candidate.monthsWithoutTurn : noPerformedLabel(candidate)}<span>${noPerformedCaption(candidate)}</span></div>
           </div>
           <div class="candidate-facts">
             <span class="badge gold">Materia sugerida: ${escapeHtml(candidate.specialties[0] || subject || "Sin historial")}</span>
