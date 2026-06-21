@@ -1335,6 +1335,46 @@
 
           <section class="panel">
             <div class="panel-header">
+              <h3>Gestionar excusa y reemplazo</h3>
+              <span class="badge red">Turno vigente</span>
+            </div>
+            <div class="rank-controls">
+              <div class="field">
+                <label for="excuseMonth">Mes del turno</label>
+                <input id="excuseMonth" type="month">
+              </div>
+              <div class="field rank-search">
+                <label for="excuseSearch">Buscar turno original</label>
+                <input id="excuseSearch" type="search" placeholder="Abogado, materia o tribunal">
+              </div>
+              <button class="btn" id="refreshExcuseTurns" type="button">Buscar turnos</button>
+            </div>
+            <div style="padding:0 18px 18px;">
+              <div class="field">
+                <label for="excuseTurnSelect">Turno que se excusa</label>
+                <select id="excuseTurnSelect"></select>
+              </div>
+              <div class="form-grid">
+                <div class="field">
+                  <label for="excuseReason">Motivo de excusa</label>
+                  <input id="excuseReason" maxlength="120" placeholder="Ej. Excusa presentada por el abogado(a)">
+                </div>
+                <div class="field">
+                  <label for="excuseDeNumber">D.E. / documento</label>
+                  <input id="excuseDeNumber" placeholder="Ej. D.E. N° 159-2026">
+                </div>
+              </div>
+              <div class="field">
+                <label for="excuseNotes">Observación para el reemplazo</label>
+                <textarea id="excuseNotes" placeholder="Antecedentes breves para registrar al reemplazante"></textarea>
+              </div>
+              <button class="btn primary" id="excuseReplacementButton" type="button">Marcar excusa y preparar reemplazo</button>
+              <p class="field-help">El turno original quedará como “Excusado” y el formulario inferior quedará listo con el mismo mes, materia y tribunal para ingresar al reemplazante.</p>
+            </div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
               <h3>Registrar nuevo turno</h3>
               <button class="btn success" id="newLawyerButton" type="button">Nuevo abogado(a)</button>
             </div>
@@ -1474,10 +1514,10 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyvUFFVA3F8boPwm22iPvYappWgzeRDG5qoelX5733WeN-HxQg1It79k6oMFIu7xMG4/exec";
-    const APP_VERSION = "1.1-estados-excusas";
-    const REQUIRED_SCRIPT_VERSION = "2026-06-20-login-users-v9";
+    const APP_VERSION = "1.2-excusas-reemplazo";
+    const REQUIRED_SCRIPT_VERSION = "2026-06-20-turn-status-v10";
     const ACCEPTED_SCRIPT_VERSIONS = [
-      "2026-06-20-login-users-v9"
+      "2026-06-20-turn-status-v10"
     ];
     const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
@@ -1531,6 +1571,14 @@
       proposalList: document.querySelector("#proposalList"),
       proposalCount: document.querySelector("#proposalCount"),
       exportProposalButton: document.querySelector("#exportProposalButton"),
+      excuseMonth: document.querySelector("#excuseMonth"),
+      excuseSearch: document.querySelector("#excuseSearch"),
+      excuseTurnSelect: document.querySelector("#excuseTurnSelect"),
+      refreshExcuseTurns: document.querySelector("#refreshExcuseTurns"),
+      excuseReason: document.querySelector("#excuseReason"),
+      excuseDeNumber: document.querySelector("#excuseDeNumber"),
+      excuseNotes: document.querySelector("#excuseNotes"),
+      excuseReplacementButton: document.querySelector("#excuseReplacementButton"),
       confirmModal: document.querySelector("#confirmModal"),
       confirmBody: document.querySelector("#confirmBody"),
       cancelConfirm: document.querySelector("#cancelConfirm"),
@@ -2523,6 +2571,132 @@
       showToast("Formulario libre para ingresar un nuevo abogado(a).");
     }
 
+    function turnRecordKey(turn) {
+      return [
+        turn.rowNumber || "",
+        turn.id || "",
+        turn.date || "",
+        normalize(turn.name),
+        normalize(turn.court),
+        normalize(turn.subject)
+      ].join("|");
+    }
+
+    function isExcusableTurn(turn) {
+      const key = statusKey(turn.status);
+      if (key.includes("excus") || key.includes("reemplazad") || key.includes("anulad")) return false;
+      if (key.includes("realizado por reemplazo")) return false;
+      return Boolean(turn.name && turn.date);
+    }
+
+    function excuseCandidates() {
+      const month = els.excuseMonth.value;
+      const text = normalize(els.excuseSearch.value || "");
+      return turns
+        .filter(isExcusableTurn)
+        .filter(turn => !month || String(turn.date).slice(0, 7) === month)
+        .filter(turn => {
+          if (!text) return true;
+          return normalize([turn.name, turn.court, turn.subject, turn.status].join(" ")).includes(text);
+        })
+        .sort((a, b) => parseDate(b.date) - parseDate(a.date) || a.name.localeCompare(b.name, "es"));
+    }
+
+    function renderExcuseTurnOptions() {
+      if (!els.excuseTurnSelect) return;
+      if (!els.excuseMonth.value) els.excuseMonth.value = nextMonthValue();
+      const candidates = excuseCandidates();
+      els.excuseTurnSelect.innerHTML = candidates.length
+        ? candidates.slice(0, 160).map(turn => {
+          const label = `${turn.month} ${turn.year} · ${turn.subject} · ${turn.court} · ${turn.name} · ${turn.status}`;
+          return `<option value="${escapeHtml(turnRecordKey(turn))}">${escapeHtml(label)}</option>`;
+        }).join("")
+        : `<option value="">No hay turnos disponibles con estos filtros</option>`;
+    }
+
+    function selectedExcuseTurn() {
+      const key = els.excuseTurnSelect.value;
+      return excuseCandidates().find(turn => turnRecordKey(turn) === key) || null;
+    }
+
+    function appendExcuseNotes(turn, reason, deNumber, extraNotes) {
+      const details = [
+        `Excusado: ${reason}`,
+        deNumber ? `Documento: ${deNumber}` : "",
+        extraNotes ? `Observación: ${extraNotes}` : ""
+      ].filter(Boolean).join(" · ");
+      return [turn.notes, details].filter(value => value && hasData(value)).join(" | ");
+    }
+
+    async function handleExcuseReplacement() {
+      if (!canWriteSafely()) return;
+      const turn = selectedExcuseTurn();
+      if (!turn) {
+        showToast("Selecciona el turno original que se excusa.");
+        return;
+      }
+      const reason = els.excuseReason.value.trim();
+      const deNumber = els.excuseDeNumber.value.trim();
+      const extraNotes = els.excuseNotes.value.trim();
+      if (!reason) {
+        showToast("Ingresa un motivo breve para la excusa.");
+        els.excuseReason.focus();
+        return;
+      }
+      const notes = appendExcuseNotes(turn, reason, deNumber, extraNotes);
+      const confirmed = window.confirm(
+        `Se marcará como Excusado el turno de:\n\n${turn.name}\n${turn.month} ${turn.year} · ${turn.subject} · ${turn.court}\n\nLuego se preparará el formulario para ingresar al reemplazante.`
+      );
+      if (!confirmed) return;
+
+      els.excuseReplacementButton.disabled = true;
+      els.excuseReplacementButton.textContent = "Actualizando...";
+      const payload = {
+        rowNumber: turn.rowNumber,
+        id: turn.id,
+        name: turn.name,
+        date: turn.date,
+        court: turn.court,
+        subject: turn.subject,
+        status: "Excusado",
+        notes,
+        reason,
+        deNumber
+      };
+      const saved = await updateTurnStatusInGoogleSheet(payload).catch(() => false);
+
+      turns = turns.map(item => turnRecordKey(item) === turnRecordKey(turn)
+        ? { ...item, status: "Excusado", notes }
+        : item);
+
+      document.querySelector("#turnDate").value = String(turn.date).slice(0, 7);
+      document.querySelector("#subjectInput").value = turn.subject || "";
+      document.querySelector("#courtInput").value = turn.court || "";
+      document.querySelector("#statusInput").value = "Realizado por reemplazo";
+      document.querySelector("#enabledInput").value = "Sí";
+      document.querySelector("#lawyerName").value = "";
+      document.querySelector("#lawyerEmail").value = "";
+      document.querySelector("#lawyerPhone").value = "";
+      document.querySelector("#lawyerAddress").value = "";
+      document.querySelector("#notesInput").value = [
+        `Reemplazo por excusa de ${turn.name}`,
+        deNumber ? deNumber : "",
+        extraNotes
+      ].filter(Boolean).join(" · ");
+
+      els.excuseReplacementButton.disabled = false;
+      els.excuseReplacementButton.textContent = "Marcar excusa y preparar reemplazo";
+      els.excuseReason.value = "";
+      els.excuseDeNumber.value = "";
+      els.excuseNotes.value = "";
+      renderAll();
+      document.querySelector("#turnForm").scrollIntoView({ behavior: "smooth", block: "start" });
+      document.querySelector("#lawyerName").focus();
+      showToast(saved
+        ? "Excusa guardada en Google Sheets. Ingresa o selecciona al reemplazante."
+        : "Excusa preparada localmente, pero no se pudo confirmar en Google Sheets.");
+    }
+
     function renderAll() {
       populateFilters();
       renderMetrics();
@@ -2534,6 +2708,7 @@
       }
       renderCandidates();
       renderProposal();
+      renderExcuseTurnOptions();
     }
 
     function showView(view) {
@@ -2613,7 +2788,7 @@
       const headers = headersRaw.map(normalize);
       const findHeader = keys => headers.findIndex(header => keys.some(key => header.includes(key)));
       const findExact = key => headers.findIndex(header => header === normalize(key));
-      return rows.map(cols => {
+      return rows.map((cols, rowIndex) => {
         const pick = (...keys) => {
           const index = findHeader(keys.map(normalize));
           return index >= 0 ? String(cols[index] ?? "").trim() : "";
@@ -2632,6 +2807,7 @@
             ? `${year}-${String(monthNumber).padStart(2, "0")}-01`
             : pick("fecha turno", "fecha");
         return {
+          rowNumber: rowIndex + 2,
           name: pick("abogado"),
           id: pickExact("ID"),
           address: pick("domicilio"),
@@ -2853,6 +3029,43 @@
           action: "append",
           callback: callbackName,
           payload: JSON.stringify(payload)
+        });
+        script.src = `${GOOGLE_APPS_SCRIPT_URL}?${params.toString()}`;
+        document.head.appendChild(script);
+      });
+    }
+
+    function updateTurnStatusInGoogleSheet(payload) {
+      if (!GOOGLE_APPS_SCRIPT_URL) return Promise.resolve(false);
+      const safePayload = { ...payload, actorToken: currentSessionToken() };
+      return new Promise(resolve => {
+        const callbackName = `turnStatus_${Date.now()}_${Math.round(Math.random() * 100000)}`;
+        const script = document.createElement("script");
+        const timer = window.setTimeout(() => {
+          cleanup();
+          resolve(false);
+        }, 12000);
+
+        function cleanup() {
+          window.clearTimeout(timer);
+          script.remove();
+          delete window[callbackName];
+        }
+
+        window[callbackName] = response => {
+          cleanup();
+          resolve(Boolean(response && response.ok));
+        };
+
+        script.onerror = () => {
+          cleanup();
+          resolve(false);
+        };
+
+        const params = new URLSearchParams({
+          action: "setturnstatus",
+          callback: callbackName,
+          payload: JSON.stringify(safePayload)
         });
         script.src = `${GOOGLE_APPS_SCRIPT_URL}?${params.toString()}`;
         document.head.appendChild(script);
@@ -3392,6 +3605,12 @@
       if (button) useCandidate(button.dataset.key);
     });
     els.exportProposalButton.addEventListener("click", exportProposalPdf);
+    els.refreshExcuseTurns.addEventListener("click", renderExcuseTurnOptions);
+    els.excuseMonth.addEventListener("change", renderExcuseTurnOptions);
+    ["input", "search", "keyup", "paste"].forEach(eventName => {
+      els.excuseSearch.addEventListener(eventName, () => window.setTimeout(renderExcuseTurnOptions, 0));
+    });
+    els.excuseReplacementButton.addEventListener("click", handleExcuseReplacement);
     document.querySelector("#suggestButton").addEventListener("click", renderCandidates);
     document.querySelector("#newLawyerButton").addEventListener("click", startNewLawyerEntry);
     document.querySelector("#refreshButton").addEventListener("click", syncFromSheet);
