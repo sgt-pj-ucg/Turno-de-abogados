@@ -263,6 +263,94 @@
       outline-offset: 2px;
     }
 
+    .login-screen {
+      min-height: 100vh;
+      display: grid;
+      place-items: center;
+      padding: 28px;
+      background:
+        linear-gradient(135deg, rgba(20,33,61,.08), rgba(184,138,45,.08)),
+        var(--page);
+    }
+
+    .login-card {
+      width: min(100%, 460px);
+      background: #fff;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      box-shadow: var(--shadow);
+      padding: 18px;
+      display: grid;
+      gap: 18px;
+    }
+
+    .login-brand {
+      display: grid;
+      justify-items: center;
+      gap: 8px;
+      text-align: center;
+      color: #fff;
+      background: var(--navy);
+      border-radius: 8px;
+      padding: 22px 18px;
+    }
+
+    .login-brand img {
+      width: 88px;
+      height: auto;
+    }
+
+    .login-brand h1 {
+      margin: 0;
+      font-size: 26px;
+      line-height: 1.1;
+      letter-spacing: 0;
+    }
+
+    .login-brand span {
+      color: rgba(255,255,255,.78);
+      font-size: 14px;
+    }
+
+    .login-form {
+      display: grid;
+      gap: 14px;
+      padding: 0 10px 10px;
+    }
+
+    .login-error {
+      min-height: 20px;
+      color: var(--red);
+      font-weight: 700;
+      font-size: 13px;
+    }
+
+    .user-chip {
+      display: grid;
+      gap: 4px;
+      padding: 10px 12px;
+      border: 1px solid rgba(255,255,255,.18);
+      border-radius: 8px;
+      color: rgba(255,255,255,.86);
+      font-size: 12px;
+    }
+
+    .user-chip strong {
+      color: #fff;
+      font-size: 14px;
+    }
+
+    .user-chip button {
+      justify-self: start;
+      margin-top: 4px;
+      border: 0;
+      background: transparent;
+      color: rgba(255,255,255,.75);
+      padding: 0;
+      cursor: pointer;
+      text-decoration: underline;
+    }
+
     .view { display: none; }
     .view.active { display: block; }
 
@@ -1074,7 +1162,27 @@
   </style>
 </head>
 <body>
-  <div class="app-shell">
+  <section class="login-screen" id="loginScreen">
+    <form class="login-card" id="loginForm">
+      <div class="login-brand">
+        <img src="logo.png" alt="Poder Judicial República de Chile">
+        <h1>Ingreso a Turno de Abogados</h1>
+        <span>Corte de Apelaciones de La Serena</span>
+      </div>
+      <div class="field">
+        <label for="loginRut">RUT funcionario</label>
+        <input id="loginRut" autocomplete="username" inputmode="text" maxlength="12" placeholder="Ejemplo: 12.345.678-9" required>
+      </div>
+      <div class="field">
+        <label for="loginPassword">Clave</label>
+        <input id="loginPassword" type="password" inputmode="numeric" autocomplete="current-password" maxlength="12" placeholder="Clave asignada" required>
+      </div>
+      <p class="login-error" id="loginError" aria-live="polite"></p>
+      <button class="btn primary" id="loginButton" type="submit">Ingresar</button>
+    </form>
+  </section>
+
+  <div class="app-shell" id="appShell" hidden>
     <aside>
       <div class="brand">
         <div class="brand-main">
@@ -1088,6 +1196,12 @@
         <button type="button" data-view="newTurn">Nuevo turno</button>
         <button type="button" data-view="alerts">Alertas de información</button>
       </nav>
+      <div class="user-chip">
+        <span>Usuario conectado</span>
+        <strong id="currentUserName">Sin sesión</strong>
+        <small id="currentUserRut"></small>
+        <button id="logoutButton" type="button">Cerrar sesión</button>
+      </div>
       <div class="sync-card">
         <p>Datos conectados a la planilla Google Sheets entregada. La sincronización actualiza búsqueda, ficha y ranking.</p>
         <p id="versionLabel" style="margin-top:-4px;font-size:11px;color:rgba(255,255,255,.58);"></p>
@@ -1353,13 +1467,13 @@
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzQijQ7a0grUabTHFwY3YmtPFsPU3rXWvbWMAcy-E8RsG4zgFD1JWkEZD8-YW0k1tFn/exec";
     const APP_VERSION = "1";
-    const REQUIRED_SCRIPT_VERSION = "2026-06-20-disable-upload-v8-drive-root-file";
+    const REQUIRED_SCRIPT_VERSION = "2026-06-20-login-users-v9";
     const ACCEPTED_SCRIPT_VERSIONS = [
-      "2026-06-20-disable-upload-v7-drive-write-auth",
-      "2026-06-20-disable-upload-v8-drive-root-file"
+      "2026-06-20-login-users-v9"
     ];
     const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
+    const USER_SESSION_STORAGE_KEY = "turnosAbogadosUserSession";
 
     const seedTurns = [
       { name: "Carolina Reyes M.", id: "12.345.678-9", address: "Monjitas 527, Santiago", phone: "+56 9 1111 2222", email: "carolina@example.cl", court: "1° Juzgado Civil", subject: "Civil", date: "2026-01-01", year: "2026", month: "Enero", status: "Cumplido", notes: "Dato de ejemplo" },
@@ -1376,9 +1490,20 @@
     let publishedScriptVersion = "";
     let historySort = { key: "date", direction: "desc" };
     let pendingDisableResolver = null;
+    let authenticatedUser = null;
     const selectedProposalKeys = new Set();
 
     const els = {
+      loginScreen: document.querySelector("#loginScreen"),
+      appShell: document.querySelector("#appShell"),
+      loginForm: document.querySelector("#loginForm"),
+      loginRut: document.querySelector("#loginRut"),
+      loginPassword: document.querySelector("#loginPassword"),
+      loginButton: document.querySelector("#loginButton"),
+      loginError: document.querySelector("#loginError"),
+      currentUserName: document.querySelector("#currentUserName"),
+      currentUserRut: document.querySelector("#currentUserRut"),
+      logoutButton: document.querySelector("#logoutButton"),
       searchName: document.querySelector("#searchName"),
       searchSubject: document.querySelector("#searchSubject"),
       searchMonths: document.querySelector("#searchMonths"),
@@ -1456,8 +1581,143 @@
       return value && String(value).trim() ? escapeHtml(value) : "Sin información";
     }
 
+    function formatRut(value) {
+      const clean = String(value || "")
+        .replace(/\./g, "")
+        .replace(/-/g, "")
+        .replace(/\s+/g, "")
+        .replace(/[^0-9kK]/g, "")
+        .toUpperCase();
+
+      if (clean.length <= 1) return clean;
+
+      const body = clean.slice(0, -1);
+      const verifier = clean.slice(-1);
+      const formattedBody = body.replace(/\B(?=(\d{3})+(?!\d))/g, ".");
+      return `${formattedBody}-${verifier}`;
+    }
+
+    function syncRutFormat() {
+      els.loginRut.value = formatRut(els.loginRut.value);
+    }
+
     function currentActor() {
-      return "Aplicacion web";
+      return authenticatedUser?.name || "Usuario no autenticado";
+    }
+
+    function currentSessionToken() {
+      return authenticatedUser?.token || "";
+    }
+
+    function showAuthenticatedApp(user) {
+      authenticatedUser = user;
+      sessionStorage.setItem(USER_SESSION_STORAGE_KEY, JSON.stringify(user));
+      els.currentUserName.textContent = user.name || "Usuario";
+      els.currentUserRut.textContent = user.rut || "";
+      els.loginScreen.hidden = true;
+      els.appShell.hidden = false;
+    }
+
+    function logoutUser() {
+      authenticatedUser = null;
+      sessionStorage.removeItem(USER_SESSION_STORAGE_KEY);
+      els.appShell.hidden = true;
+      els.loginScreen.hidden = false;
+      els.loginPassword.value = "";
+      els.loginError.textContent = "";
+      window.setTimeout(() => els.loginRut.focus(), 0);
+    }
+
+    function restoreUserSession() {
+      const rawSession = sessionStorage.getItem(USER_SESSION_STORAGE_KEY);
+      if (!rawSession) return false;
+      try {
+        const user = JSON.parse(rawSession);
+        if (!user?.token || !user?.name) return false;
+        showAuthenticatedApp(user);
+        return true;
+      } catch {
+        sessionStorage.removeItem(USER_SESSION_STORAGE_KEY);
+        return false;
+      }
+    }
+
+    function loginWithAppsScript(rut, password) {
+      if (!GOOGLE_APPS_SCRIPT_URL) return Promise.resolve({ ok: false, message: "No hay Apps Script configurado." });
+      return new Promise(resolve => {
+        const callbackName = `loginUser_${Date.now()}_${Math.round(Math.random() * 100000)}`;
+        const script = document.createElement("script");
+        const timer = window.setTimeout(() => {
+          cleanup();
+          resolve({ ok: false, message: "El Apps Script no respondió al inicio de sesión." });
+        }, 12000);
+
+        function cleanup() {
+          window.clearTimeout(timer);
+          script.remove();
+          delete window[callbackName];
+        }
+
+        window[callbackName] = payload => {
+          cleanup();
+          resolve(payload || { ok: false, message: "Respuesta vacía de Apps Script." });
+        };
+
+        script.onerror = () => {
+          cleanup();
+          resolve({ ok: false, message: "No se pudo conectar con Apps Script." });
+        };
+
+        const params = new URLSearchParams({
+          action: "login",
+          callback: callbackName,
+          payload: JSON.stringify({ rut, password }),
+          cacheBust: Date.now()
+        });
+        script.src = `${GOOGLE_APPS_SCRIPT_URL}?${params.toString()}`;
+        document.head.appendChild(script);
+      });
+    }
+
+    async function handleLogin(event) {
+      event.preventDefault();
+      syncRutFormat();
+      const rut = els.loginRut.value.trim();
+      const password = els.loginPassword.value.trim();
+
+      if (!rut || !password) {
+        els.loginError.textContent = "Ingresa RUT y clave.";
+        return;
+      }
+
+      els.loginButton.disabled = true;
+      els.loginButton.textContent = "Validando...";
+      els.loginError.textContent = "";
+
+      const result = await loginWithAppsScript(rut, password);
+
+      els.loginButton.disabled = false;
+      els.loginButton.textContent = "Ingresar";
+
+      if (!result.ok) {
+        els.loginError.textContent = result.message || "No fue posible iniciar sesión.";
+        return;
+      }
+
+      showAuthenticatedApp({
+        token: result.token,
+        rut: result.rut,
+        name: result.name
+      });
+      showToast(`Sesión iniciada: ${result.name}.`);
+      initializeAppData();
+    }
+
+    function requireAuthenticatedUser() {
+      if (currentSessionToken()) return true;
+      showToast("Ingresa con RUT y clave antes de guardar cambios.");
+      logoutUser();
+      return false;
     }
 
     function contactIssues(profile) {
@@ -2511,6 +2771,7 @@
     }
 
     function canWriteSafely() {
+      if (!requireAuthenticatedUser()) return false;
       if (scriptVersionOk === true) return true;
       showToast(`No se enviará el cambio: Apps Script publicado está en ${publishedScriptVersion || "versión antigua o no verificada"}. Publica ${REQUIRED_SCRIPT_VERSION}.`);
       checkAppsScriptVersion();
@@ -2519,6 +2780,7 @@
 
     function saveTurnToGoogleSheet(turn) {
       if (!GOOGLE_APPS_SCRIPT_URL) return Promise.resolve(false);
+      const payload = { ...turn, actorToken: currentSessionToken() };
       return new Promise(resolve => {
         const callbackName = `turnSave_${Date.now()}_${Math.round(Math.random() * 100000)}`;
         const script = document.createElement("script");
@@ -2546,7 +2808,7 @@
         const params = new URLSearchParams({
           action: "append",
           callback: callbackName,
-          payload: JSON.stringify(turn)
+          payload: JSON.stringify(payload)
         });
         script.src = `${GOOGLE_APPS_SCRIPT_URL}?${params.toString()}`;
         document.head.appendChild(script);
@@ -2610,6 +2872,7 @@
         fileName: typeof evidence === "object" ? evidence.fileName || "" : "",
         mimeType: typeof evidence === "object" ? evidence.mimeType || "" : "",
         fileData: typeof evidence === "object" ? evidence.fileData || "" : "",
+        actorToken: currentSessionToken(),
         actor: currentActor()
       };
 
@@ -2700,6 +2963,7 @@
             phone: contact.phone,
             email: contact.email,
             address: contact.address,
+            actorToken: currentSessionToken(),
             actor: currentActor()
           })
         });
@@ -3131,16 +3395,31 @@
       els.backTop.classList.toggle("visible", window.scrollY > 420);
       els.backBottom.classList.toggle("visible", newTurnActive && !nearBottom);
     }
+
+    function initializeAppData() {
+      document.querySelector("#versionLabel").textContent = `Versión ${APP_VERSION}`;
+      renderAll();
+      renderLawyerDetail(null);
+      checkAppsScriptVersion();
+      syncFromSheet().catch(() => showToast("No se pudo sincronizar la planilla; se muestran datos de ejemplo."));
+    }
+
     window.addEventListener("scroll", updateFloatingButtons);
+    els.loginForm.addEventListener("submit", handleLogin);
+    els.loginRut.addEventListener("input", syncRutFormat);
+    els.loginRut.addEventListener("blur", syncRutFormat);
+    els.logoutButton.addEventListener("click", logoutUser);
     document.querySelectorAll("nav button").forEach(button => {
       button.addEventListener("click", () => showView(button.dataset.view));
     });
 
-    document.querySelector("#versionLabel").textContent = `Versión ${APP_VERSION}`;
-    renderAll();
-    renderLawyerDetail(null);
-    checkAppsScriptVersion();
-    syncFromSheet().catch(() => showToast("No se pudo sincronizar la planilla; se muestran datos de ejemplo."));
+    if (restoreUserSession()) {
+      initializeAppData();
+    } else {
+      els.appShell.hidden = true;
+      els.loginScreen.hidden = false;
+      window.setTimeout(() => els.loginRut.focus(), 0);
+    }
   </script>
 </body>
 </html>
