@@ -24,6 +24,10 @@
 
     * { box-sizing: border-box; }
 
+    [hidden] {
+      display: none !important;
+    }
+
     body {
       margin: 0;
       background: linear-gradient(135deg, rgba(20,33,61,.05), rgba(184,138,45,.05)), var(--page);
@@ -130,6 +134,7 @@
       border: 1px solid rgba(255,255,255,.16);
       border-radius: 8px;
       padding: 14px;
+      margin-top: 16px;
       background: rgba(255,255,255,.07);
     }
 
@@ -333,6 +338,8 @@
       border-radius: 8px;
       color: rgba(255,255,255,.86);
       font-size: 12px;
+      margin-bottom: 16px;
+      background: rgba(255,255,255,.035);
     }
 
     .user-chip strong {
