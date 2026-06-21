@@ -1474,7 +1474,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyvUFFVA3F8boPwm22iPvYappWgzeRDG5qoelX5733WeN-HxQg1It79k6oMFIu7xMG4/exec";
-    const APP_VERSION = "1";
+    const APP_VERSION = "1.1-estados-excusas";
     const REQUIRED_SCRIPT_VERSION = "2026-06-20-login-users-v9";
     const ACCEPTED_SCRIPT_VERSIONS = [
       "2026-06-20-login-users-v9"
@@ -1913,8 +1913,10 @@
     function countsAsPerformedTurn(status) {
       const key = statusKey(status);
       if (!key) return true;
+      if (key.includes("realizado por reemplazo")) return true;
       if (key.includes("excus")) return false;
       if (key.includes("reemplazad")) return false;
+      if (key.includes("original reemplaz")) return false;
       if (key.includes("anulad")) return false;
       if (key.includes("programad")) return false;
       if (key.includes("reagend")) return false;
