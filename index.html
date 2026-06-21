@@ -1514,7 +1514,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyvUFFVA3F8boPwm22iPvYappWgzeRDG5qoelX5733WeN-HxQg1It79k6oMFIu7xMG4/exec";
-    const APP_VERSION = "1.2-excusas-reemplazo";
+    const APP_VERSION = "1.2.1-excusas-reemplazo";
     const REQUIRED_SCRIPT_VERSION = "2026-06-20-turn-status-v10";
     const ACCEPTED_SCRIPT_VERSIONS = [
       "2026-06-20-turn-status-v10"
@@ -2534,7 +2534,7 @@
               </label>
               <p class="muted">${displayValue(candidate.email || candidate.phone)} · ${candidate.turnsTotal} turno${candidate.turnsTotal === 1 ? "" : "s"} realizado${candidate.turnsTotal === 1 ? "" : "s"}</p>
             </div>
-            <div class="score">${candidate.lastTurn ? candidate.monthsWithoutTurn : "Nuevo"}<span>${candidate.lastTurn ? "meses sin turno" : "sin turno realizado"}</span></div>
+            <div class="score">${candidate.lastTurn ? candidate.monthsWithoutTurn : "Sin turno"}<span>${candidate.lastTurn ? "meses sin turno" : "realizado"}</span></div>
           </div>
           <div class="candidate-facts">
             <span class="badge gold">Materia sugerida: ${escapeHtml(candidate.specialties[0] || subject || "Sin historial")}</span>
