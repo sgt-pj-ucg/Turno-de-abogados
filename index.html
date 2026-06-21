@@ -1623,6 +1623,9 @@
       els.currentUserRut.textContent = user.rut || "";
       els.loginScreen.hidden = true;
       els.appShell.hidden = false;
+      els.loginScreen.style.display = "none";
+      els.appShell.style.display = "";
+      window.scrollTo({ top: 0, behavior: "auto" });
     }
 
     function logoutUser() {
@@ -1630,6 +1633,8 @@
       sessionStorage.removeItem(USER_SESSION_STORAGE_KEY);
       els.appShell.hidden = true;
       els.loginScreen.hidden = false;
+      els.appShell.style.display = "none";
+      els.loginScreen.style.display = "";
       els.loginPassword.value = "";
       els.loginError.textContent = "";
       window.setTimeout(() => els.loginRut.focus(), 0);
@@ -3425,6 +3430,8 @@
     } else {
       els.appShell.hidden = true;
       els.loginScreen.hidden = false;
+      els.appShell.style.display = "none";
+      els.loginScreen.style.display = "";
       window.setTimeout(() => els.loginRut.focus(), 0);
     }
   </script>
