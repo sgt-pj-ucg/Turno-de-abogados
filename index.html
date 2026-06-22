@@ -15,7 +15,7 @@
       --gold: #b88a2d;
       --green: #0f766e;
       --red: #b42318;
-      --blueA: #255d9b;
+      --blue: #255d9b;
       --soft-blue: #e8f0fa;
       --soft-gold: #f7efe0;
       --shadow: 0 14px 35px rgba(20, 33, 61, .12);
@@ -773,6 +773,59 @@
       background: #fff;
     }
 
+    .turns-summary {
+      padding: 16px 18px 0;
+    }
+
+    .monthly-turns {
+      padding: 0 18px 18px;
+    }
+
+    .monthly-turns tr.replacement-row {
+      background: #fff8e1;
+      box-shadow: inset 4px 0 0 #c7942a;
+    }
+
+    .monthly-turns tr.replacement-row td {
+      border-bottom-color: #f1d99a;
+    }
+
+    .monthly-turns tr.replacement-row .turn-person strong {
+      color: #7a581a;
+    }
+
+    .turn-person {
+      display: grid;
+      gap: 4px;
+      min-width: 210px;
+    }
+
+    .turn-person strong {
+      color: var(--navy);
+    }
+
+    .turn-contact {
+      display: grid;
+      gap: 3px;
+      color: #475467;
+      font-size: 12px;
+      line-height: 1.35;
+      min-width: 230px;
+    }
+
+    .turn-note {
+      color: #475467;
+      font-size: 12px;
+      line-height: 1.35;
+      max-width: 320px;
+    }
+
+    .turn-state {
+      display: grid;
+      gap: 6px;
+      min-width: 145px;
+    }
+
     .rank-controls {
       padding: 16px 18px;
       background: #fafbfc;
@@ -1216,6 +1269,7 @@
         <button type="button" data-view="newTurn">Nuevo turno</button>
         <button type="button" data-view="alerts">Alertas de información</button>
         <button type="button" data-view="excuses">Excusas y reemplazos</button>
+        <button type="button" data-view="turns">Turnos de Abogados</button>
       </nav>
       <div class="user-chip">
         <span>Usuario conectado</span>
@@ -1481,6 +1535,39 @@
           </div>
         </section>
       </section>
+
+      <section class="view" id="turnsView">
+        <section class="panel">
+          <div class="panel-header">
+            <h3>Turnos de Abogados</h3>
+            <span class="badge blue" id="monthlyTurnBadge">Seleccione periodo</span>
+          </div>
+          <div class="rank-controls">
+            <div class="field">
+              <label for="monthlyTurnPeriod">Año y mes</label>
+              <input id="monthlyTurnPeriod" type="month">
+            </div>
+            <div class="field rank-search">
+              <label for="monthlyTurnSearch">Buscar dentro del turno</label>
+              <input id="monthlyTurnSearch" type="search" placeholder="Abogado, materia, tribunal o D.E.">
+            </div>
+            <div class="field">
+              <label for="monthlyTurnStatus">Estado</label>
+              <select id="monthlyTurnStatus">
+                <option value="all">Todos</option>
+                <option value="active">Vigentes / realizados</option>
+                <option value="excused">Excusados</option>
+                <option value="replacement">Reemplazos</option>
+              </select>
+            </div>
+            <button class="btn primary rank-action" id="refreshMonthlyTurns" type="button">Mostrar turno</button>
+          </div>
+          <div class="turns-summary summary-grid" id="monthlyTurnSummary"></div>
+          <div class="monthly-turns" id="monthlyTurnResults">
+            <div class="empty">Selecciona un año y mes para revisar el turno de abogados.</div>
+          </div>
+        </section>
+      </section>
     </main>
   </div>
 
@@ -1536,7 +1623,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzfQVVcc6JS35trCFWqZYxoEImTPdNPqesvnGaY4Eo7G92k7W3sjEIvWeg9uCuTHAQ5/exec";
-    const APP_VERSION = "1.2.6-confirmacion-contacto";
+    const APP_VERSION = "1.2.8-reemplazante-amarillo";
     const REQUIRED_SCRIPT_VERSION = "2026-06-20-turn-status-v10";
     const ACCEPTED_SCRIPT_VERSIONS = [
       "2026-06-20-turn-status-v10"
@@ -1601,6 +1688,13 @@
       excuseDeNumber: document.querySelector("#excuseDeNumber"),
       excuseNotes: document.querySelector("#excuseNotes"),
       excuseReplacementButton: document.querySelector("#excuseReplacementButton"),
+      monthlyTurnPeriod: document.querySelector("#monthlyTurnPeriod"),
+      monthlyTurnSearch: document.querySelector("#monthlyTurnSearch"),
+      monthlyTurnStatus: document.querySelector("#monthlyTurnStatus"),
+      refreshMonthlyTurns: document.querySelector("#refreshMonthlyTurns"),
+      monthlyTurnBadge: document.querySelector("#monthlyTurnBadge"),
+      monthlyTurnSummary: document.querySelector("#monthlyTurnSummary"),
+      monthlyTurnResults: document.querySelector("#monthlyTurnResults"),
       confirmModal: document.querySelector("#confirmModal"),
       confirmBody: document.querySelector("#confirmBody"),
       cancelConfirm: document.querySelector("#cancelConfirm"),
@@ -2692,6 +2786,152 @@
       return [turn.notes, details].filter(value => value && hasData(value)).join(" | ");
     }
 
+    function periodLabel(period) {
+      if (!period) return "Seleccione periodo";
+      const [year, month] = String(period).split("-");
+      const date = new Date(Number(year), Number(month) - 1, 1);
+      return date.toLocaleDateString("es-CL", { month: "long", year: "numeric" });
+    }
+
+    function latestTurnPeriod() {
+      const periods = uniqueValues(turns.map(turn => ({ period: String(turn.date || "").slice(0, 7) })), "period")
+        .filter(Boolean)
+        .sort((a, b) => b.localeCompare(a));
+      return periods[0] || nextMonthValue();
+    }
+
+    function turnStatusType(turn) {
+      const key = statusKey(turn.status);
+      if (key.includes("realizado por reemplazo")) return "replacement";
+      if (key.includes("excus") || key.includes("original reemplaz") || key.includes("reemplazad")) return "excused";
+      if (key.includes("reemplazo")) return "replacement";
+      return "active";
+    }
+
+    function extractDeNumber(turn) {
+      const text = String(turn.notes || "");
+      const match = text.match(/(?:D\.?\s*E\.?|Documento|Decreto\s+Econ[oó]mico)\s*(?:N[°ºo.]*)?\s*[:\-]?\s*([A-Za-z0-9./\-]+(?:\s*-\s*\d{2,4})?)/i);
+      if (match) return match[0].replace(/^Documento\s*:\s*/i, "").trim();
+      const parts = text.split(/[|·]/).map(part => part.trim()).filter(Boolean);
+      return parts.find(part => /^(?:N[°ºo.]?\s*)?\d{2,8}(?:[-/]\d{2,4})?$/.test(part)) || "";
+    }
+
+    function monthlyTurnMatchesStatus(turn, filter) {
+      if (!filter || filter === "all") return true;
+      const type = turnStatusType(turn);
+      if (filter === "active") return type === "active";
+      if (filter === "excused") return type === "excused";
+      if (filter === "replacement") return type === "replacement";
+      return true;
+    }
+
+    function monthlyTurnsForDisplay() {
+      if (!els.monthlyTurnPeriod.value) els.monthlyTurnPeriod.value = latestTurnPeriod();
+      const period = els.monthlyTurnPeriod.value;
+      const text = normalize(els.monthlyTurnSearch.value || "");
+      const statusFilter = els.monthlyTurnStatus.value || "all";
+
+      return turns
+        .filter(turn => String(turn.date || "").slice(0, 7) === period)
+        .filter(turn => monthlyTurnMatchesStatus(turn, statusFilter))
+        .filter(turn => {
+          if (!text) return true;
+          return normalize([
+            turn.subject,
+            turn.court,
+            turn.name,
+            turn.status,
+            turn.email,
+            turn.phone,
+            turn.address,
+            turn.notes,
+            extractDeNumber(turn)
+          ].join(" ")).includes(text);
+        })
+        .sort((a, b) =>
+          String(a.subject || "").localeCompare(String(b.subject || ""), "es") ||
+          String(a.court || "").localeCompare(String(b.court || ""), "es") ||
+          String(a.name || "").localeCompare(String(b.name || ""), "es")
+        );
+    }
+
+    function renderMonthlyTurns() {
+      if (!els.monthlyTurnResults) return;
+      if (!els.monthlyTurnPeriod.value) els.monthlyTurnPeriod.value = latestTurnPeriod();
+      const period = els.monthlyTurnPeriod.value;
+      const periodTurns = turns.filter(turn => String(turn.date || "").slice(0, 7) === period);
+      const displayedTurns = monthlyTurnsForDisplay();
+      const activeCount = periodTurns.filter(turn => turnStatusType(turn) === "active").length;
+      const excusedCount = periodTurns.filter(turn => turnStatusType(turn) === "excused").length;
+      const replacementCount = periodTurns.filter(turn => turnStatusType(turn) === "replacement").length;
+
+      els.monthlyTurnBadge.textContent = periodLabel(period);
+      els.monthlyTurnSummary.innerHTML = `
+        <div class="info-box"><span>Periodo</span><strong>${escapeHtml(periodLabel(period))}</strong></div>
+        <div class="info-box"><span>Registros del mes</span><strong>${periodTurns.length}</strong></div>
+        <div class="info-box"><span>Vigentes / realizados</span><strong>${activeCount}</strong></div>
+        <div class="info-box"><span>Excusados</span><strong>${excusedCount}</strong></div>
+        <div class="info-box"><span>Reemplazos</span><strong>${replacementCount}</strong></div>
+        <div class="info-box"><span>Mostrados</span><strong>${displayedTurns.length}</strong></div>
+      `;
+
+      if (!displayedTurns.length) {
+        els.monthlyTurnResults.innerHTML = `<div class="empty">No hay turnos que coincidan con los filtros seleccionados.</div>`;
+        return;
+      }
+
+      els.monthlyTurnResults.innerHTML = `
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Materia</th>
+                <th>Tribunal</th>
+                <th>Abogado(a)</th>
+                <th>D.E.</th>
+                <th>Contacto</th>
+                <th>Estado</th>
+                <th>Observaciones</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${displayedTurns.map(turn => {
+                const type = turnStatusType(turn);
+                return `
+                <tr class="${type === "replacement" ? "replacement-row" : ""}">
+                  <td><span class="badge gold">${escapeHtml(turn.subject || "Sin materia")}</span></td>
+                  <td>${displayValue(turn.court)}</td>
+                  <td>
+                    <div class="turn-person">
+                      <strong>${escapeHtml(turn.name)}</strong>
+                      <span class="muted">${escapeHtml(turn.month)} ${escapeHtml(turn.year)}</span>
+                    </div>
+                  </td>
+                  <td>${displayValue(extractDeNumber(turn))}</td>
+                  <td>
+                    <div class="turn-contact">
+                      <span><strong>Correo:</strong> ${displayValue(turn.email)}</span>
+                      <span><strong>Teléfono:</strong> ${displayValue(turn.phone)}</span>
+                      <span><strong>Domicilio:</strong> ${displayValue(turn.address)}</span>
+                    </div>
+                  </td>
+                  <td>
+                    <div class="turn-state">
+                      <span class="badge ${statusBadgeClass(turn.status)}">${escapeHtml(turn.status || "Sin estado")}</span>
+                      ${type === "excused" ? `<span class="muted">No cuenta como turno realizado</span>` : ""}
+                      ${type === "replacement" ? `<span class="muted">Reemplazante</span>` : ""}
+                    </div>
+                  </td>
+                  <td><div class="turn-note">${displayValue(turn.notes)}</div></td>
+                </tr>
+              `;
+              }).join("")}
+            </tbody>
+          </table>
+        </div>
+      `;
+    }
+
     async function handleExcuseReplacement() {
       if (!canWriteSafely()) return;
       const turn = selectedExcuseTurn();
@@ -2744,7 +2984,7 @@
       document.querySelector("#lawyerAddress").value = "";
       document.querySelector("#notesInput").value = [
         `Reemplazo por excusa de ${turn.name}`,
-        deNumber ? deNumber : "",
+        deNumber ? `D.E.: ${deNumber}` : "",
         extraNotes
       ].filter(Boolean).join(" · ");
 
@@ -2774,6 +3014,7 @@
       renderCandidates();
       renderProposal();
       renderExcuseTurnOptions();
+      renderMonthlyTurns();
     }
 
     function showView(view) {
@@ -2783,20 +3024,25 @@
       const isNewTurn = view === "newTurn";
       const isAlerts = view === "alerts";
       const isExcuses = view === "excuses";
+      const isTurns = view === "turns";
       document.querySelector("#pageTitle").textContent = isNewTurn
         ? "Generar y registrar nuevo turno"
         : isAlerts
           ? "Alertas de información"
           : isExcuses
             ? "Excusas y reemplazos"
-            : "Consulta institucional de abogados";
+            : isTurns
+              ? "Turnos de Abogados"
+              : "Consulta institucional de abogados";
       document.querySelector("#pageSubtitle").textContent = isNewTurn
         ? "Revisa el ranking por meses sin turno, especialidades históricas y registra una nueva asignación."
         : isAlerts
           ? "Revisa datos faltantes, abogados excluidos del ranking y calidad de contacto."
           : isExcuses
             ? "Marca un turno como excusado y prepara de inmediato el ingreso del abogado reemplazante."
-            : "Busca libremente por nombre, revisa datos de contacto y consulta todos los turnos realizados por año, mes, tribunal y materia.";
+            : isTurns
+              ? "Busca por año y mes, revisa titulares, excusas, reemplazos, D.E. y datos de contacto del turno mensual."
+              : "Busca libremente por nombre, revisa datos de contacto y consulta todos los turnos realizados por año, mes, tribunal y materia.";
       updateFloatingButtons();
     }
 
@@ -3683,6 +3929,12 @@
       els.excuseSearch.addEventListener(eventName, () => window.setTimeout(renderExcuseTurnOptions, 0));
     });
     els.excuseReplacementButton.addEventListener("click", handleExcuseReplacement);
+    els.refreshMonthlyTurns.addEventListener("click", renderMonthlyTurns);
+    els.monthlyTurnPeriod.addEventListener("change", renderMonthlyTurns);
+    els.monthlyTurnStatus.addEventListener("change", renderMonthlyTurns);
+    ["input", "search", "keyup", "paste"].forEach(eventName => {
+      els.monthlyTurnSearch.addEventListener(eventName, () => window.setTimeout(renderMonthlyTurns, 0));
+    });
     document.querySelector("#suggestButton").addEventListener("click", renderCandidates);
     document.querySelector("#newLawyerButton").addEventListener("click", startNewLawyerEntry);
     document.querySelector("#clearCourtInput").addEventListener("click", () => clearAndFocusTurnField("#courtInput", "tribunal"));
