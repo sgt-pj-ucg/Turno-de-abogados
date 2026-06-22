@@ -452,6 +452,29 @@
       font-weight: 700;
     }
 
+    .field.pending-field {
+      border: 1px solid #d8dee8;
+      border-radius: 8px;
+      background: #f5f7fa;
+      padding: 10px;
+    }
+
+    .field.pending-field label::after {
+      content: " pendiente";
+      color: #667085;
+      font-weight: 700;
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .field.pending-field input,
+    .field.pending-field select,
+    .field.pending-field textarea {
+      background: #fff;
+      border-color: #bfc8d6;
+    }
+
     .field-help {
       margin: 0;
       color: var(--muted);
@@ -1684,7 +1707,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwn4_3EE7QDNDbuLrykB645ssRSfvVXdJWZZNtMNpu-PrPMH_iPoCAIGyRQH1dwDpsQ/exec";
-    const APP_VERSION = "1.4.1-rut-layout";
+    const APP_VERSION = "1.4.2-pendientes-suaves";
     const REQUIRED_SCRIPT_VERSION = "2026-06-21-lawyer-rut-v11";
     const ACCEPTED_SCRIPT_VERSIONS = [
       "2026-06-21-lawyer-rut-v11"
@@ -1827,6 +1850,10 @@
 
     function displayValue(value) {
       return value && String(value).trim() ? escapeHtml(value) : "Sin información";
+    }
+
+    function pendingFieldClass(value) {
+      return hasData(value) ? "field" : "field pending-field";
     }
 
     function formatRut(value) {
@@ -2403,19 +2430,19 @@
         </div>
         <div class="contact-edit-panel" data-contact-editor="${escapeHtml(profile.key)}">
           <div class="form-grid">
-            <div class="field">
+            <div class="${pendingFieldClass(profile.rut)}">
               <label>RUT abogado(a)</label>
               <input type="text" data-profile-contact-field="rut" value="${hasData(profile.rut) ? escapeHtml(formatRut(profile.rut)) : ""}" placeholder="12.345.678-9">
             </div>
-            <div class="field">
+            <div class="${pendingFieldClass(profile.address)}">
               <label>Dirección</label>
               <input type="text" data-profile-contact-field="address" value="${hasData(profile.address) ? escapeHtml(profile.address) : ""}" placeholder="Domicilio actualizado">
             </div>
-            <div class="field">
+            <div class="${pendingFieldClass(profile.phone)}">
               <label>Teléfono</label>
               <input type="text" data-profile-contact-field="phone" value="${hasData(profile.phone) ? escapeHtml(profile.phone) : ""}" placeholder="Teléfono actualizado">
             </div>
-            <div class="field">
+            <div class="${pendingFieldClass(profile.email)}">
               <label>Correo</label>
               <input type="text" data-profile-contact-field="email" value="${hasData(profile.email) ? escapeHtml(profile.email) : ""}" placeholder="correo@dominio.cl">
             </div>
@@ -2589,19 +2616,19 @@
             <span class="badge gold">${profile.turns.length} turno${profile.turns.length === 1 ? "" : "s"}</span>
           </div>
           <div class="alert-edit-grid">
-            <div class="field">
+            <div class="${pendingFieldClass(profile.rut)}">
               <label>RUT abogado(a)</label>
               <input type="text" data-contact-field="rut" value="${hasData(profile.rut) ? escapeHtml(formatRut(profile.rut)) : ""}" placeholder="12.345.678-9">
             </div>
-            <div class="field">
+            <div class="${pendingFieldClass(profile.email)}">
               <label>Correo</label>
               <input type="text" data-contact-field="email" value="${hasData(profile.email) ? escapeHtml(profile.email) : ""}" placeholder="correo@dominio.cl">
             </div>
-            <div class="field">
+            <div class="${pendingFieldClass(profile.phone)}">
               <label>Teléfono</label>
               <input type="text" data-contact-field="phone" value="${hasData(profile.phone) ? escapeHtml(profile.phone) : ""}" placeholder="Teléfono de contacto">
             </div>
-            <div class="field alert-address-field">
+            <div class="${pendingFieldClass(profile.address)} alert-address-field">
               <label>Domicilio</label>
               <input type="text" data-contact-field="address" value="${hasData(profile.address) ? escapeHtml(profile.address) : ""}" placeholder="Dirección o domicilio">
             </div>
