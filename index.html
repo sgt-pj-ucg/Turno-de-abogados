@@ -801,8 +801,8 @@
     .monthly-table .col-subject { width: 12%; }
     .monthly-table .col-court { width: 16%; }
     .monthly-table .col-lawyer { width: 19%; }
-    .monthly-table .col-de { width: 9%; }
-    .monthly-table .col-contact { width: 26%; }
+    .monthly-table .col-de { width: 7%; }
+    .monthly-table .col-contact { width: 28%; }
     .monthly-table .col-status { width: 13%; }
     .monthly-table .col-notes { width: 15%; }
 
@@ -814,6 +814,8 @@
     }
 
     .turn-subject-badge {
+      display: flex;
+      width: fit-content;
       justify-content: flex-start;
       text-align: left;
     }
@@ -823,6 +825,7 @@
       font-size: 13px;
       line-height: 1.25;
       white-space: nowrap;
+      font-weight: 600;
     }
 
     .turn-person {
@@ -1654,7 +1657,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwn4_3EE7QDNDbuLrykB645ssRSfvVXdJWZZNtMNpu-PrPMH_iPoCAIGyRQH1dwDpsQ/exec";
-    const APP_VERSION = "1.3.2-turnos-tabla-ajustada";
+    const APP_VERSION = "1.3.3-turnos-de-limpio";
     const REQUIRED_SCRIPT_VERSION = "2026-06-20-turn-status-v10";
     const ACCEPTED_SCRIPT_VERSIONS = [
       "2026-06-20-turn-status-v10"
@@ -2915,11 +2918,11 @@
       ].filter(Boolean).join(" | ");
       const text = String(sources || "");
       const directMatch = text.match(/(?:D\.?\s*E\.?|Decreto\s+Econ[oó]mico)\s*(?:N[°ºo.]*)?\s*[:\-]?\s*([0-9]{1,6}(?:\s*[-/]\s*[0-9]{2,4})?)/i);
-      if (directMatch) return `D.E. N° ${directMatch[1].replace(/\s+/g, "").replace("/", "-")}`;
+      if (directMatch) return directMatch[1].replace(/\s+/g, "").replace("/", "-");
       const documentMatch = text.match(/Documento\s*:\s*(?:D\.?\s*E\.?\s*)?(?:N[°ºo.]*)?\s*([0-9]{1,6}(?:\s*[-/]\s*[0-9]{2,4})?)/i);
-      if (documentMatch) return `D.E. N° ${documentMatch[1].replace(/\s+/g, "").replace("/", "-")}`;
+      if (documentMatch) return documentMatch[1].replace(/\s+/g, "").replace("/", "-");
       const looseMatch = text.match(/\b([0-9]{2,6}\s*[-/]\s*20[0-9]{2})\b/);
-      if (looseMatch) return `D.E. N° ${looseMatch[1].replace(/\s+/g, "").replace("/", "-")}`;
+      if (looseMatch) return looseMatch[1].replace(/\s+/g, "").replace("/", "-");
       return "";
     }
 
