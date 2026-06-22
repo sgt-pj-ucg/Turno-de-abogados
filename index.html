@@ -1202,6 +1202,7 @@
         <button class="active" type="button" data-view="search">Buscar abogado</button>
         <button type="button" data-view="newTurn">Nuevo turno</button>
         <button type="button" data-view="alerts">Alertas de información</button>
+        <button type="button" data-view="excuses">Excusas y reemplazos</button>
       </nav>
       <div class="user-chip">
         <span>Usuario conectado</span>
@@ -1335,46 +1336,6 @@
 
           <section class="panel">
             <div class="panel-header">
-              <h3>Gestionar excusa y reemplazo</h3>
-              <span class="badge red">Turno vigente</span>
-            </div>
-            <div class="rank-controls">
-              <div class="field">
-                <label for="excuseMonth">Mes del turno</label>
-                <input id="excuseMonth" type="month">
-              </div>
-              <div class="field rank-search">
-                <label for="excuseSearch">Buscar turno original</label>
-                <input id="excuseSearch" type="search" placeholder="Abogado, materia o tribunal">
-              </div>
-              <button class="btn" id="refreshExcuseTurns" type="button">Buscar turnos</button>
-            </div>
-            <div style="padding:0 18px 18px;">
-              <div class="field">
-                <label for="excuseTurnSelect">Turno que se excusa</label>
-                <select id="excuseTurnSelect"></select>
-              </div>
-              <div class="form-grid">
-                <div class="field">
-                  <label for="excuseReason">Motivo de excusa</label>
-                  <input id="excuseReason" maxlength="120" placeholder="Ej. Excusa presentada por el abogado(a)">
-                </div>
-                <div class="field">
-                  <label for="excuseDeNumber">D.E. / documento</label>
-                  <input id="excuseDeNumber" placeholder="Ej. D.E. N° 159-2026">
-                </div>
-              </div>
-              <div class="field">
-                <label for="excuseNotes">Observación para el reemplazo</label>
-                <textarea id="excuseNotes" placeholder="Antecedentes breves para registrar al reemplazante"></textarea>
-              </div>
-              <button class="btn primary" id="excuseReplacementButton" type="button">Marcar excusa y preparar reemplazo</button>
-              <p class="field-help">El turno original quedará como “Excusado” y el formulario inferior quedará listo con el mismo mes, materia y tribunal para ingresar al reemplazante.</p>
-            </div>
-          </section>
-
-          <section class="panel">
-            <div class="panel-header">
               <h3>Registrar nuevo turno</h3>
               <button class="btn success" id="newLawyerButton" type="button">Nuevo abogado(a)</button>
             </div>
@@ -1459,6 +1420,48 @@
           <div class="alert-detail" id="alertDetail"></div>
         </section>
       </section>
+
+      <section class="view" id="excusesView">
+        <section class="panel">
+          <div class="panel-header">
+            <h3>Gestionar excusa y reemplazo</h3>
+            <span class="badge red">Turno vigente</span>
+          </div>
+          <div class="rank-controls">
+            <div class="field">
+              <label for="excuseMonth">Mes del turno</label>
+              <input id="excuseMonth" type="month">
+            </div>
+            <div class="field rank-search">
+              <label for="excuseSearch">Buscar turno original</label>
+              <input id="excuseSearch" type="search" placeholder="Abogado, materia o tribunal">
+            </div>
+            <button class="btn" id="refreshExcuseTurns" type="button">Buscar turnos</button>
+          </div>
+          <div style="padding:0 18px 18px;">
+            <div class="field">
+              <label for="excuseTurnSelect">Turno que se excusa</label>
+              <select id="excuseTurnSelect"></select>
+            </div>
+            <div class="form-grid">
+              <div class="field">
+                <label for="excuseReason">Motivo de excusa</label>
+                <input id="excuseReason" maxlength="120" placeholder="Ej. Excusa presentada por el abogado(a)">
+              </div>
+              <div class="field">
+                <label for="excuseDeNumber">D.E. / documento</label>
+                <input id="excuseDeNumber" placeholder="Ej. D.E. N° 159-2026">
+              </div>
+            </div>
+            <div class="field">
+              <label for="excuseNotes">Observación para el reemplazo</label>
+              <textarea id="excuseNotes" placeholder="Antecedentes breves para registrar al reemplazante"></textarea>
+            </div>
+            <button class="btn primary" id="excuseReplacementButton" type="button">Marcar excusa y preparar reemplazo</button>
+            <p class="field-help">El turno original quedará como “Excusado” y luego se abrirá el formulario de nuevo turno con el mismo mes, materia y tribunal para ingresar al reemplazante.</p>
+          </div>
+        </section>
+      </section>
     </main>
   </div>
 
@@ -1514,7 +1517,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyvUFFVA3F8boPwm22iPvYappWgzeRDG5qoelX5733WeN-HxQg1It79k6oMFIu7xMG4/exec";
-    const APP_VERSION = "1.2.2-excusas-reemplazo";
+    const APP_VERSION = "1.2.3-excusas-menu";
     const REQUIRED_SCRIPT_VERSION = "2026-06-20-turn-status-v10";
     const ACCEPTED_SCRIPT_VERSIONS = [
       "2026-06-20-turn-status-v10"
@@ -2721,6 +2724,7 @@
       els.excuseDeNumber.value = "";
       els.excuseNotes.value = "";
       renderAll();
+      showView("newTurn");
       document.querySelector("#turnForm").scrollIntoView({ behavior: "smooth", block: "start" });
       document.querySelector("#lawyerName").focus();
       showToast(saved
@@ -2748,16 +2752,21 @@
       document.querySelectorAll("nav button").forEach(button => button.classList.toggle("active", button.dataset.view === view));
       const isNewTurn = view === "newTurn";
       const isAlerts = view === "alerts";
+      const isExcuses = view === "excuses";
       document.querySelector("#pageTitle").textContent = isNewTurn
         ? "Generar y registrar nuevo turno"
         : isAlerts
           ? "Alertas de información"
-          : "Consulta institucional de abogados";
+          : isExcuses
+            ? "Excusas y reemplazos"
+            : "Consulta institucional de abogados";
       document.querySelector("#pageSubtitle").textContent = isNewTurn
         ? "Revisa el ranking por meses sin turno, especialidades históricas y registra una nueva asignación."
         : isAlerts
           ? "Revisa datos faltantes, abogados excluidos del ranking y calidad de contacto."
-          : "Busca libremente por nombre, revisa datos de contacto y consulta todos los turnos realizados por año, mes, tribunal y materia.";
+          : isExcuses
+            ? "Marca un turno como excusado y prepara de inmediato el ingreso del abogado reemplazante."
+            : "Busca libremente por nombre, revisa datos de contacto y consulta todos los turnos realizados por año, mes, tribunal y materia.";
       updateFloatingButtons();
     }
 
