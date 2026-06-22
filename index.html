@@ -492,6 +492,10 @@
       align-items: start;
     }
 
+    .turn-meta-grid {
+      grid-template-columns: 1fr 1fr 180px;
+    }
+
     form {
       padding: 18px;
       display: grid;
@@ -1101,9 +1105,9 @@
 
     .alert-edit-grid {
       display: grid;
-      grid-template-columns: repeat(3, minmax(180px, 1fr)) 132px;
+      grid-template-columns: repeat(3, minmax(180px, 1fr)) minmax(132px, auto);
       gap: 12px;
-      align-items: stretch;
+      align-items: end;
     }
 
     .alert-edit-grid > .info-box,
@@ -1119,11 +1123,24 @@
       padding: 14px 16px;
     }
 
-    .alert-edit-grid .btn {
-      align-self: stretch;
-      justify-content: center;
+    .alert-address-field {
+      grid-column: 1 / span 3;
+    }
+
+    .alert-save-cell {
+      grid-column: 4;
+      display: flex;
+      justify-content: flex-end;
+      align-items: flex-end;
       min-height: 82px;
-      width: 100%;
+    }
+
+    .alert-edit-grid .btn {
+      justify-content: center;
+      min-height: 44px;
+      width: auto;
+      min-width: 132px;
+      padding-inline: 18px;
     }
 
     .proposal-list {
@@ -1258,8 +1275,12 @@
       .actions { justify-content: stretch; }
       .actions .btn { flex: 1; }
       .contact-toolbar { align-items: flex-start; flex-direction: column; }
-      .metrics, .contact-grid, .summary-grid, .form-grid, .rank-controls, .alert-grid, .alert-edit-grid, .document-row, .period-picker { grid-template-columns: 1fr; }
+      .metrics, .contact-grid, .summary-grid, .form-grid, .turn-meta-grid, .rank-controls, .alert-grid, .alert-edit-grid, .document-row, .period-picker { grid-template-columns: 1fr; }
       .rank-search { grid-column: span 1; }
+      .alert-address-field,
+      .alert-save-cell { grid-column: auto; }
+      .alert-save-cell { justify-content: stretch; min-height: 0; }
+      .alert-edit-grid .btn { width: 100%; }
       .alert-edit-grid .btn { min-height: 48px; }
       .panel-header { align-items: flex-start; flex-direction: column; }
       .range-buttons button { min-width: 78px; }
@@ -1445,6 +1466,11 @@
                 <label for="lawyerName">Nombre</label>
                 <input id="lawyerName" required placeholder="Ej. Carolina Reyes">
               </div>
+              <div class="field">
+                <label for="lawyerRut">RUT abogado(a)</label>
+                <input id="lawyerRut" placeholder="12.345.678-9" inputmode="text">
+                <p class="field-help">Desde ahora debe completarse para nuevos abogados y futuras actualizaciones.</p>
+              </div>
               <div class="form-grid">
                 <div class="field">
                   <label for="lawyerEmail">Correo(s) / contacto</label>
@@ -1459,14 +1485,6 @@
               <div class="field">
                 <label for="lawyerAddress">Dirección</label>
                 <input id="lawyerAddress" placeholder="Domicilio profesional">
-              </div>
-              <div class="field">
-                <label for="enabledInput">Habilitado turno</label>
-                <select id="enabledInput">
-                  <option selected>Sí</option>
-                  <option>No</option>
-                </select>
-                <p class="field-help">Si está en “No”, el abogado(a) no será considerado en el ranking.</p>
               </div>
               <div class="form-grid">
                 <div class="field">
@@ -1488,7 +1506,7 @@
                   <p class="field-help">Puedes cambiarla aunque el abogado(a) venga desde el ranking.</p>
                 </div>
               </div>
-              <div class="form-grid">
+              <div class="form-grid turn-meta-grid">
                 <div class="field">
                   <label for="turnDate">Mes del turno</label>
                   <input id="turnDate" type="month" required>
@@ -1503,6 +1521,14 @@
                     <option>Reemplazado</option>
                     <option>Anulado</option>
                   </select>
+                </div>
+                <div class="field">
+                  <label for="enabledInput">Habilitado</label>
+                  <select id="enabledInput">
+                    <option selected>Sí</option>
+                    <option>No</option>
+                  </select>
+                  <p class="field-help">Controla si entra al ranking.</p>
                 </div>
               </div>
               <div class="field">
@@ -1658,10 +1684,10 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwn4_3EE7QDNDbuLrykB645ssRSfvVXdJWZZNtMNpu-PrPMH_iPoCAIGyRQH1dwDpsQ/exec";
-    const APP_VERSION = "1.3.4-materia-izquierda";
-    const REQUIRED_SCRIPT_VERSION = "2026-06-20-turn-status-v10";
+    const APP_VERSION = "1.4.1-rut-layout";
+    const REQUIRED_SCRIPT_VERSION = "2026-06-21-lawyer-rut-v11";
     const ACCEPTED_SCRIPT_VERSIONS = [
-      "2026-06-20-turn-status-v10"
+      "2026-06-21-lawyer-rut-v11"
     ];
     const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
@@ -1949,6 +1975,7 @@
 
     function contactIssues(profile) {
       const issues = [];
+      if (!hasData(profile.rut)) issues.push("RUT");
       if (!hasData(profile.email)) issues.push("correo");
       if (!hasData(profile.phone)) issues.push("teléfono");
       if (!hasData(profile.address)) issues.push("domicilio");
@@ -2150,6 +2177,19 @@
       return "green";
     }
 
+    function formatRut(value) {
+      const clean = String(value || "")
+        .toUpperCase()
+        .replace(/\./g, "")
+        .replace(/\s+/g, "")
+        .replace(/[^0-9K-]/g, "")
+        .replace(/-/g, "");
+      if (clean.length < 2) return clean;
+      const body = clean.slice(0, -1);
+      const dv = clean.slice(-1);
+      return `${body.replace(/\B(?=(\d{3})+(?!\d))/g, ".")}-${dv}`;
+    }
+
     function uniqueValues(list, key) {
       return [...new Set(list.map(item => item[key]).filter(Boolean))]
         .sort((a, b) => a.localeCompare(b, "es"));
@@ -2164,6 +2204,7 @@
             key,
             name: turn.name,
             id: turn.id,
+            rut: turn.rut,
             address: turn.address,
             phone: turn.phone,
             email: turn.email,
@@ -2180,6 +2221,7 @@
         profile.turns.sort((a, b) => parseDate(b.date) - parseDate(a.date));
         profile.performedTurns = profile.turns.filter(turn => countsAsPerformedTurn(turn.status));
         profile.name = profile.turns[0]?.name || profile.name;
+        profile.rut = profile.turns.find(turn => hasData(turn.rut))?.rut || profile.rut || "";
         profile.address = profile.turns[0]?.address || profile.address;
         profile.phone = profile.turns[0]?.phone || profile.phone;
         profile.email = profile.turns[0]?.email || profile.email;
@@ -2288,6 +2330,7 @@
       els.lawyerResults.innerHTML = profiles.slice(0, 80).map(profile => `
         <button class="lawyer-option ${profile.key === selectedLawyerKey ? "active" : ""}" type="button" data-key="${escapeHtml(profile.key)}">
           <strong>${escapeHtml(profile.name)}</strong>
+          <span class="muted">RUT: ${escapeHtml(profile.rut ? formatRut(profile.rut) : "Sin RUT registrado")}</span>
           <span class="muted">${escapeHtml(profile.email || profile.phone || "Sin contacto registrado")}</span>
           <span class="muted">${profile.turnsTotal} turno${profile.turnsTotal === 1 ? "" : "s"} realizado${profile.turnsTotal === 1 ? "" : "s"} · Último realizado: ${profile.lastTurn ? escapeHtml(profile.lastTurn.month + " " + profile.lastTurn.year) : "Sin registro"}</span>
         </button>
@@ -2353,12 +2396,17 @@
           </div>
         ` : ""}
         <div class="contact-grid">
+          <div class="info-box"><span>RUT</span><strong>${displayValue(profile.rut)}</strong></div>
           <div class="info-box"><span>Dirección</span><strong>${displayValue(profile.address)}</strong></div>
           <div class="info-box"><span>Teléfono</span><strong>${displayValue(profile.phone)}</strong></div>
           <div class="info-box"><span>Correo</span>${profile.email ? `<a href="mailto:${escapeHtml(profile.email)}">${escapeHtml(profile.email)}</a>` : "<strong>Sin información</strong>"}</div>
         </div>
         <div class="contact-edit-panel" data-contact-editor="${escapeHtml(profile.key)}">
           <div class="form-grid">
+            <div class="field">
+              <label>RUT abogado(a)</label>
+              <input type="text" data-profile-contact-field="rut" value="${hasData(profile.rut) ? escapeHtml(formatRut(profile.rut)) : ""}" placeholder="12.345.678-9">
+            </div>
             <div class="field">
               <label>Dirección</label>
               <input type="text" data-profile-contact-field="address" value="${hasData(profile.address) ? escapeHtml(profile.address) : ""}" placeholder="Domicilio actualizado">
@@ -2422,6 +2470,7 @@
     function alertGroups() {
       const profiles = groupLawyers();
       return {
+        missingRut: profiles.filter(profile => !hasData(profile.rut)),
         missingEmail: profiles.filter(profile => !hasData(profile.email)),
         missingPhone: profiles.filter(profile => !hasData(profile.phone)),
         missingAddress: profiles.filter(profile => !hasData(profile.address)),
@@ -2431,6 +2480,11 @@
 
     function alertConfig(type) {
       return {
+        missingRut: {
+          title: "Sin RUT",
+          description: "Abogados sin RUT registrado en la base.",
+          empty: "No hay abogados pendientes por RUT."
+        },
         missingEmail: {
           title: "Sin correo",
           description: "Abogados con correo vacío o no informado.",
@@ -2457,6 +2511,7 @@
     function renderAlerts() {
       const groups = alertGroups();
       const boxes = [
+        ["missingRut", "Sin RUT"],
         ["missingEmail", "Sin correo"],
         ["missingPhone", "Sin teléfono"],
         ["missingAddress", "Sin domicilio"],
@@ -2512,10 +2567,13 @@
             ${profile.disableReason ? `<p class="muted"><strong>Motivo:</strong> ${escapeHtml(profile.disableReason)}</p>` : ""}
             ${profile.disableDocumentUrl ? `<p class="muted"><strong>Respaldo:</strong> <a href="${escapeHtml(profile.disableDocumentUrl)}" target="_blank" rel="noopener">Ver documento</a></p>` : ""}
             <div class="alert-edit-grid">
+              <div class="info-box"><span>RUT</span><strong>${displayValue(profile.rut)}</strong></div>
               <div class="info-box"><span>Correo</span><strong>${displayValue(profile.email)}</strong></div>
               <div class="info-box"><span>Teléfono</span><strong>${displayValue(profile.phone)}</strong></div>
-              <div class="info-box"><span>Domicilio</span><strong>${displayValue(profile.address)}</strong></div>
-              <button class="btn primary enable-from-alert" type="button" data-key="${escapeHtml(profile.key)}">Habilitar</button>
+              <div class="info-box alert-address-field"><span>Domicilio</span><strong>${displayValue(profile.address)}</strong></div>
+              <div class="alert-save-cell">
+                <button class="btn primary enable-from-alert" type="button" data-key="${escapeHtml(profile.key)}">Habilitar</button>
+              </div>
             </div>
           </article>
         `;
@@ -2532,6 +2590,10 @@
           </div>
           <div class="alert-edit-grid">
             <div class="field">
+              <label>RUT abogado(a)</label>
+              <input type="text" data-contact-field="rut" value="${hasData(profile.rut) ? escapeHtml(formatRut(profile.rut)) : ""}" placeholder="12.345.678-9">
+            </div>
+            <div class="field">
               <label>Correo</label>
               <input type="text" data-contact-field="email" value="${hasData(profile.email) ? escapeHtml(profile.email) : ""}" placeholder="correo@dominio.cl">
             </div>
@@ -2539,11 +2601,13 @@
               <label>Teléfono</label>
               <input type="text" data-contact-field="phone" value="${hasData(profile.phone) ? escapeHtml(profile.phone) : ""}" placeholder="Teléfono de contacto">
             </div>
-            <div class="field">
+            <div class="field alert-address-field">
               <label>Domicilio</label>
               <input type="text" data-contact-field="address" value="${hasData(profile.address) ? escapeHtml(profile.address) : ""}" placeholder="Dirección o domicilio">
             </div>
-            <button class="btn primary save-contact" type="button" data-key="${escapeHtml(profile.key)}">Guardar datos</button>
+            <div class="alert-save-cell">
+              <button class="btn primary save-contact" type="button" data-key="${escapeHtml(profile.key)}">Guardar datos</button>
+            </div>
           </div>
         </article>
       `;
@@ -2562,6 +2626,7 @@
           <thead>
             <tr>
               <th>Abogado(a)</th>
+              <th>RUT</th>
               <th>Meses sin turno</th>
               <th>Materias previas</th>
               <th>Último tribunal</th>
@@ -2574,6 +2639,7 @@
             ${profiles.map(profile => `
               <tr>
                 <td>${escapeHtml(profile.name)}</td>
+                <td>${escapeHtml(profile.rut ? formatRut(profile.rut) : "Sin RUT")}</td>
                 <td>${escapeHtml(monthsDisplay(profile))}</td>
                 <td>${escapeHtml(profile.subjects.join(", "))}</td>
                 <td>${escapeHtml(profile.lastTurn?.court || "")}</td>
@@ -2599,6 +2665,7 @@
         <tr>
           <td>${index + 1}</td>
           <td>${escapeHtml(profile.name)}</td>
+          <td>${escapeHtml(profile.rut ? formatRut(profile.rut) : "Sin RUT")}</td>
           <td>${escapeHtml(monthsDisplay(profile))}</td>
           <td>${escapeHtml(profile.subjects.join(", "))}</td>
           <td>${escapeHtml(profile.lastTurn?.court || "")}</td>
@@ -2632,6 +2699,7 @@
               <tr>
                 <th>#</th>
                 <th>Abogado(a)</th>
+                <th>RUT</th>
                 <th>Meses sin turno</th>
                 <th>Materias previas</th>
                 <th>Último tribunal</th>
@@ -2720,7 +2788,7 @@
                 <input type="checkbox" class="proposal-check" data-key="${escapeHtml(candidate.key)}" ${selectedProposalKeys.has(candidate.key) ? "checked" : ""}>
                 <span>${index + 1}. ${escapeHtml(candidate.name)}</span>
               </label>
-              <p class="muted">${displayValue(candidate.email || candidate.phone)} · ${candidate.turnsTotal} turno${candidate.turnsTotal === 1 ? "" : "s"} realizado${candidate.turnsTotal === 1 ? "" : "s"}</p>
+              <p class="muted">RUT: ${escapeHtml(candidate.rut ? formatRut(candidate.rut) : "Sin RUT")} · ${displayValue(candidate.email || candidate.phone)} · ${candidate.turnsTotal} turno${candidate.turnsTotal === 1 ? "" : "s"} realizado${candidate.turnsTotal === 1 ? "" : "s"}</p>
             </div>
             <div class="score">${candidate.lastTurn ? candidate.monthsWithoutTurn : noPerformedLabel(candidate)}<span>${noPerformedCaption(candidate)}</span></div>
           </div>
@@ -2744,6 +2812,7 @@
       const subjectInput = document.querySelector("#subjectInput");
       const courtInput = document.querySelector("#courtInput");
       document.querySelector("#lawyerName").value = profile.name || "";
+      document.querySelector("#lawyerRut").value = profile.rut ? formatRut(profile.rut) : "";
       document.querySelector("#lawyerEmail").value = profile.email || "";
       document.querySelector("#lawyerPhone").value = profile.phone || "";
       document.querySelector("#lawyerAddress").value = profile.address || "";
@@ -2950,6 +3019,7 @@
             turn.subject,
             turn.court,
             turn.name,
+            turn.rut,
             turn.status,
             turn.email,
             turn.phone,
@@ -3031,6 +3101,7 @@
                       <span><strong>Correo:</strong> ${displayValue(turn.email)}</span>
                       <span><strong>Teléfono:</strong> ${displayValue(turn.phone)}</span>
                       <span><strong>Domicilio:</strong> ${displayValue(turn.address)}</span>
+                      <span><strong>RUT:</strong> ${displayValue(turn.rut)}</span>
                     </div>
                   </td>
                   <td>
@@ -3096,6 +3167,7 @@
       document.querySelector("#statusInput").value = "Realizado por reemplazo";
       document.querySelector("#enabledInput").value = "Sí";
       document.querySelector("#lawyerName").value = "";
+      document.querySelector("#lawyerRut").value = "";
       document.querySelector("#lawyerEmail").value = "";
       document.querySelector("#lawyerPhone").value = "";
       document.querySelector("#lawyerAddress").value = "";
@@ -3241,9 +3313,10 @@
             : pick("fecha turno", "fecha");
         return {
           rowNumber: rowIndex + 2,
-          name: pick("abogado"),
-          id: pickExact("ID"),
-          address: pick("domicilio"),
+        name: pick("abogado"),
+        id: pickExact("ID"),
+        rut: formatRut(pick("rut abogado", "rut abogado(a)", "rut", "run abogado", "run")),
+        address: pick("domicilio"),
           phone: pick("fono", "telefono", "teléfono"),
           email: pick("email", "correo"),
           court: canonicalCourtName(pick("tribunal", "unidad")),
@@ -3652,6 +3725,7 @@
             name: profile.name,
             currentPhone: profile.phone,
             currentEmail: profile.email,
+            rut: contact.rut,
             phone: contact.phone,
             email: contact.email,
             address: contact.address,
@@ -3669,13 +3743,14 @@
       if (!profile || !card) return;
       if (!canWriteSafely()) return;
       const contact = {
+        rut: formatRut(card.querySelector('[data-contact-field="rut"]')?.value.trim() || ""),
         email: card.querySelector('[data-contact-field="email"]')?.value.trim() || "",
         phone: card.querySelector('[data-contact-field="phone"]')?.value.trim() || "",
         address: card.querySelector('[data-contact-field="address"]')?.value.trim() || ""
       };
 
-      if (!contact.email && !contact.phone && !contact.address) {
-        showToast("Completa al menos un dato de contacto antes de guardar.");
+      if (!contact.rut && !contact.email && !contact.phone && !contact.address) {
+        showToast("Completa al menos un dato antes de guardar.");
         return;
       }
       if (!confirmContactValidation(contact)) return;
@@ -3698,6 +3773,7 @@
 
       turns = turns.map(turn => personKey(turn) === key ? {
         ...turn,
+        rut: contact.rut || turn.rut,
         email: contact.email || turn.email,
         phone: contact.phone || turn.phone,
         address: contact.address || turn.address
@@ -3714,12 +3790,13 @@
       if (!canWriteSafely()) return;
 
       const contact = {
+        rut: formatRut(panel.querySelector('[data-profile-contact-field="rut"]')?.value.trim() || ""),
         address: panel.querySelector('[data-profile-contact-field="address"]')?.value.trim() || "",
         phone: panel.querySelector('[data-profile-contact-field="phone"]')?.value.trim() || "",
         email: panel.querySelector('[data-profile-contact-field="email"]')?.value.trim() || ""
       };
 
-      if (!contact.email && !contact.phone && !contact.address) {
+      if (!contact.rut && !contact.email && !contact.phone && !contact.address) {
         showToast("Completa al menos un dato antes de guardar.");
         return;
       }
@@ -3744,6 +3821,7 @@
 
       turns = turns.map(turn => personKey(turn) === key ? {
         ...turn,
+        rut: contact.rut || turn.rut,
         address: contact.address || turn.address,
         phone: contact.phone || turn.phone,
         email: contact.email || turn.email
@@ -3841,6 +3919,7 @@
       els.confirmBody.innerHTML = `
         <div class="summary-grid">
           <div class="info-box"><span>Abogado(a)</span><strong>${escapeHtml(turn.name)}</strong></div>
+          <div class="info-box"><span>RUT</span><strong>${displayValue(turn.rut)}</strong></div>
           <div class="info-box"><span>Materia</span><strong>${escapeHtml(turn.subject)}</strong></div>
           <div class="info-box"><span>Tribunal</span><strong>${escapeHtml(turn.court)}</strong></div>
           <div class="info-box"><span>Mes</span><strong>${escapeHtml(turn.month)} ${escapeHtml(turn.year)}</strong></div>
@@ -3897,6 +3976,7 @@
       event.preventDefault();
       const monthValue = document.querySelector("#turnDate").value;
       const lawyerName = document.querySelector("#lawyerName").value.trim();
+      const lawyerRut = formatRut(document.querySelector("#lawyerRut").value.trim());
       const courtValue = document.querySelector("#courtInput").value.trim();
       const subjectValue = document.querySelector("#subjectInput").value.trim();
 
@@ -3908,6 +3988,11 @@
       if (!monthValue) {
         showToast("Selecciona el mes del turno antes de guardar.");
         document.querySelector("#turnDate").focus();
+        return;
+      }
+      if (!lawyerRut) {
+        showToast("Completa el RUT del abogado(a) antes de guardar.");
+        document.querySelector("#lawyerRut").focus();
         return;
       }
       if (!courtValue || !subjectValue) {
@@ -3924,6 +4009,7 @@
         name: lawyerName,
         source: "Formulario web abogados de turno",
         id: "",
+        rut: lawyerRut,
         address: document.querySelector("#lawyerAddress").value.trim(),
         phone: document.querySelector("#lawyerPhone").value.trim(),
         email: document.querySelector("#lawyerEmail").value.trim(),
@@ -3989,6 +4075,11 @@
       setLawyerEnabled(button.dataset.key, button.dataset.enabledValue);
     });
 
+    els.lawyerDetail.addEventListener("input", event => {
+      const input = event.target.closest('[data-profile-contact-field="rut"]');
+      if (input) input.value = formatRut(input.value);
+    });
+
     els.alertPanel.addEventListener("click", event => {
       const button = event.target.closest("[data-alert-type]");
       if (!button) return;
@@ -4008,6 +4099,11 @@
       if (enableButton) {
         setLawyerEnabled(enableButton.dataset.key, "Sí");
       }
+    });
+
+    els.alertDetail.addEventListener("input", event => {
+      const input = event.target.closest('[data-contact-field="rut"]');
+      if (input) input.value = formatRut(input.value);
     });
 
     ["input", "keyup", "search", "paste", "compositionend"].forEach(eventName => {
@@ -4059,6 +4155,12 @@
     document.querySelector("#newLawyerButton").addEventListener("click", startNewLawyerEntry);
     document.querySelector("#clearCourtInput").addEventListener("click", () => clearAndFocusTurnField("#courtInput", "tribunal"));
     document.querySelector("#clearSubjectInput").addEventListener("click", () => clearAndFocusTurnField("#subjectInput", "materia"));
+    document.querySelector("#lawyerRut").addEventListener("input", event => {
+      event.target.value = formatRut(event.target.value);
+    });
+    document.querySelector("#lawyerRut").addEventListener("blur", event => {
+      event.target.value = formatRut(event.target.value);
+    });
     document.querySelector("#refreshButton").addEventListener("click", syncFromSheet);
     document.querySelector("#syncButton").addEventListener("click", syncFromSheet);
     document.querySelector("#goNewTurn").addEventListener("click", () => showView("newTurn"));
