@@ -1491,7 +1491,7 @@
               </div>
               <div class="field">
                 <label for="lawyerRut">RUT abogado(a)</label>
-                <input id="lawyerRut" placeholder="12.345.678-9" inputmode="text">
+                <input id="lawyerRut" placeholder="12.345.678-5" inputmode="text">
                 <p class="field-help">Desde ahora debe completarse para nuevos abogados y futuras actualizaciones.</p>
               </div>
               <div class="form-grid">
@@ -1706,11 +1706,11 @@
 
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
-    const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwn4_3EE7QDNDbuLrykB645ssRSfvVXdJWZZNtMNpu-PrPMH_iPoCAIGyRQH1dwDpsQ/exec";
-    const APP_VERSION = "1.4.2-pendientes-suaves";
-    const REQUIRED_SCRIPT_VERSION = "2026-06-21-lawyer-rut-v11";
+    const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz04bHG89KZ9Va8kKRPyrZa6ra0sI-8vIzGmwrRnBQ6cW5YuArbBWdajPYGtaxB3fhI/exec";
+    const APP_VERSION = "1.4.3-rut-validado";
+    const REQUIRED_SCRIPT_VERSION = "2026-06-22-rut-validado-v12";
     const ACCEPTED_SCRIPT_VERSIONS = [
-      "2026-06-21-lawyer-rut-v11"
+      "2026-06-22-rut-validado-v12"
     ];
     const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
@@ -2012,11 +2012,15 @@
     function validateContact(contact) {
       const errors = [];
       const warnings = [];
+      const rut = String(contact.rut || "").trim();
       const email = String(contact.email || "").trim();
       const phone = String(contact.phone || "").trim();
       const address = String(contact.address || "").trim();
       const phoneDigits = phone.replace(/\D/g, "");
 
+      if (rut && !isValidRut(rut)) {
+        errors.push("El RUT no es válido. Revisa número y dígito verificador.");
+      }
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
         errors.push("El correo no parece válido.");
       }
@@ -2215,6 +2219,31 @@
       const body = clean.slice(0, -1);
       const dv = clean.slice(-1);
       return `${body.replace(/\B(?=(\d{3})+(?!\d))/g, ".")}-${dv}`;
+    }
+
+    function cleanRut(value) {
+      return String(value || "")
+        .toUpperCase()
+        .replace(/\./g, "")
+        .replace(/\s+/g, "")
+        .replace(/-/g, "")
+        .replace(/[^0-9K]/g, "");
+    }
+
+    function isValidRut(value) {
+      const clean = cleanRut(value);
+      if (!/^\d{7,8}[0-9K]$/.test(clean)) return false;
+      const body = clean.slice(0, -1);
+      const verifier = clean.slice(-1);
+      let sum = 0;
+      let multiplier = 2;
+      for (let index = body.length - 1; index >= 0; index--) {
+        sum += Number(body[index]) * multiplier;
+        multiplier = multiplier === 7 ? 2 : multiplier + 1;
+      }
+      const expectedNumber = 11 - (sum % 11);
+      const expected = expectedNumber === 11 ? "0" : expectedNumber === 10 ? "K" : String(expectedNumber);
+      return verifier === expected;
     }
 
     function uniqueValues(list, key) {
@@ -2432,7 +2461,7 @@
           <div class="form-grid">
             <div class="${pendingFieldClass(profile.rut)}">
               <label>RUT abogado(a)</label>
-              <input type="text" data-profile-contact-field="rut" value="${hasData(profile.rut) ? escapeHtml(formatRut(profile.rut)) : ""}" placeholder="12.345.678-9">
+              <input type="text" data-profile-contact-field="rut" value="${hasData(profile.rut) ? escapeHtml(formatRut(profile.rut)) : ""}" placeholder="12.345.678-5">
             </div>
             <div class="${pendingFieldClass(profile.address)}">
               <label>Dirección</label>
@@ -2618,7 +2647,7 @@
           <div class="alert-edit-grid">
             <div class="${pendingFieldClass(profile.rut)}">
               <label>RUT abogado(a)</label>
-              <input type="text" data-contact-field="rut" value="${hasData(profile.rut) ? escapeHtml(formatRut(profile.rut)) : ""}" placeholder="12.345.678-9">
+              <input type="text" data-contact-field="rut" value="${hasData(profile.rut) ? escapeHtml(formatRut(profile.rut)) : ""}" placeholder="12.345.678-5">
             </div>
             <div class="${pendingFieldClass(profile.email)}">
               <label>Correo</label>
@@ -4019,6 +4048,11 @@
       }
       if (!lawyerRut) {
         showToast("Completa el RUT del abogado(a) antes de guardar.");
+        document.querySelector("#lawyerRut").focus();
+        return;
+      }
+      if (!isValidRut(lawyerRut)) {
+        showToast("El RUT del abogado(a) no es válido. Revisa número y dígito verificador.");
         document.querySelector("#lawyerRut").focus();
         return;
       }
