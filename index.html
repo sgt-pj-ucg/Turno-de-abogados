@@ -482,6 +482,127 @@
       line-height: 1.35;
     }
 
+    .rut-lookup-box {
+      margin-top: 8px;
+      display: flex;
+      flex-wrap: wrap;
+      align-items: center;
+      gap: 8px;
+      position: relative;
+    }
+
+    .rut-lookup-box .rut-lookup-label {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: .04em;
+    }
+
+    .rut-lookup-link {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 32px;
+      padding: 6px 10px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--navy);
+      font-size: 12px;
+      font-weight: 800;
+      text-decoration: none;
+      transition: border-color .2s ease, background .2s ease, transform .2s ease;
+    }
+
+    .rut-lookup-link:hover {
+      border-color: #aeb8ca;
+      background: #f7f9fc;
+      transform: translateY(-1px);
+    }
+
+    .rut-lookup-trigger {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 32px;
+      padding: 6px 12px;
+      border: 1px solid #cfd6e3;
+      border-radius: 8px;
+      background: #fff;
+      color: var(--navy);
+      font-size: 12px;
+      font-weight: 800;
+      cursor: pointer;
+    }
+
+    .rut-lookup-popover {
+      display: none;
+      position: absolute;
+      left: 0;
+      top: calc(100% + 8px);
+      z-index: 30;
+      width: min(360px, 82vw);
+      padding: 14px;
+      border: 1px solid #cfd6e3;
+      border-radius: 10px;
+      background: #fff;
+      box-shadow: 0 18px 45px rgba(16, 24, 40, .18);
+    }
+
+    .rut-lookup-box.open .rut-lookup-popover {
+      display: block;
+    }
+
+    .rut-lookup-popover h5 {
+      margin: 0 0 6px;
+      font-size: 14px;
+    }
+
+    .rut-lookup-popover p {
+      margin: 0 0 10px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.4;
+    }
+
+    .rut-preview-pill {
+      display: inline-flex;
+      margin: 0 0 10px;
+      padding: 6px 10px;
+      border-radius: 8px;
+      background: #eef4ff;
+      color: var(--navy);
+      font-size: 13px;
+      font-weight: 800;
+    }
+
+    .rut-popup-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .rut-popup-actions button,
+    .rut-popup-actions a {
+      min-height: 32px;
+      padding: 6px 10px;
+      border: 1px solid #cfd6e3;
+      border-radius: 8px;
+      background: #fff;
+      color: var(--navy);
+      font-size: 12px;
+      font-weight: 800;
+      text-decoration: none;
+      cursor: pointer;
+    }
+
+    .rut-popup-actions a {
+      background: var(--navy);
+      color: #fff;
+      border-color: var(--navy);
+    }
+
     input, select, textarea {
       width: 100%;
       min-width: 0;
@@ -1492,6 +1613,19 @@
               <div class="field">
                 <label for="lawyerRut">RUT abogado(a)</label>
                 <input id="lawyerRut" placeholder="12.345.678-5" inputmode="text">
+                <div class="rut-lookup-box" data-rut-lookup>
+                  <span class="rut-lookup-label">Verificación externa</span>
+                  <button class="rut-lookup-trigger" type="button" data-rut-lookup-trigger>Consultar RUT</button>
+                  <div class="rut-lookup-popover" data-rut-popover>
+                    <h5>Consultar en Poder Judicial</h5>
+                    <p>Copia el RUT y abre la búsqueda oficial. En la página externa solo debes pegarlo y presionar buscar.</p>
+                    <span class="rut-preview-pill" data-rut-preview>Sin RUT ingresado</span>
+                    <div class="rut-popup-actions">
+                      <button type="button" data-copy-rut>Copiar RUT</button>
+                      <a href="https://www.pjud.cl/transparencia/busqueda-de-abogados" target="_blank" rel="noopener">Abrir Poder Judicial</a>
+                    </div>
+                  </div>
+                </div>
                 <p class="field-help">Desde ahora debe completarse para nuevos abogados y futuras actualizaciones.</p>
               </div>
               <div class="form-grid">
@@ -1707,7 +1841,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz04bHG89KZ9Va8kKRPyrZa6ra0sI-8vIzGmwrRnBQ6cW5YuArbBWdajPYGtaxB3fhI/exec";
-    const APP_VERSION = "1.4.3-rut-validado";
+    const APP_VERSION = "1.4.5-popup-rut-demo";
     const REQUIRED_SCRIPT_VERSION = "2026-06-22-rut-validado-v12";
     const ACCEPTED_SCRIPT_VERSIONS = [
       "2026-06-22-rut-validado-v12"
@@ -1854,6 +1988,24 @@
 
     function pendingFieldClass(value) {
       return hasData(value) ? "field" : "field pending-field";
+    }
+
+    function rutLookupLinks() {
+      return `
+        <div class="rut-lookup-box" data-rut-lookup>
+          <span class="rut-lookup-label">Verificación externa</span>
+          <button class="rut-lookup-trigger" type="button" data-rut-lookup-trigger>Consultar RUT</button>
+          <div class="rut-lookup-popover" data-rut-popover>
+            <h5>Consultar en Poder Judicial</h5>
+            <p>Copia el RUT y abre la búsqueda oficial. En la página externa solo debes pegarlo y presionar buscar.</p>
+            <span class="rut-preview-pill" data-rut-preview>Sin RUT ingresado</span>
+            <div class="rut-popup-actions">
+              <button type="button" data-copy-rut>Copiar RUT</button>
+              <a href="https://www.pjud.cl/transparencia/busqueda-de-abogados" target="_blank" rel="noopener">Abrir Poder Judicial</a>
+            </div>
+          </div>
+        </div>
+      `;
     }
 
     function formatRut(value) {
@@ -2462,6 +2614,7 @@
             <div class="${pendingFieldClass(profile.rut)}">
               <label>RUT abogado(a)</label>
               <input type="text" data-profile-contact-field="rut" value="${hasData(profile.rut) ? escapeHtml(formatRut(profile.rut)) : ""}" placeholder="12.345.678-5">
+              ${rutLookupLinks()}
             </div>
             <div class="${pendingFieldClass(profile.address)}">
               <label>Dirección</label>
@@ -2648,6 +2801,7 @@
             <div class="${pendingFieldClass(profile.rut)}">
               <label>RUT abogado(a)</label>
               <input type="text" data-contact-field="rut" value="${hasData(profile.rut) ? escapeHtml(formatRut(profile.rut)) : ""}" placeholder="12.345.678-5">
+              ${rutLookupLinks()}
             </div>
             <div class="${pendingFieldClass(profile.email)}">
               <label>Correo</label>
@@ -3295,6 +3449,64 @@
       els.toast.textContent = message;
       els.toast.classList.add("visible");
       window.setTimeout(() => els.toast.classList.remove("visible"), 2800);
+    }
+
+    function closeRutPopovers(exceptBox = null) {
+      document.querySelectorAll("[data-rut-lookup].open").forEach(box => {
+        if (box !== exceptBox) box.classList.remove("open");
+      });
+    }
+
+    function rutValueForLookup(box) {
+      const field = box.closest(".field") || box.parentElement;
+      const input = field?.querySelector('input[id="lawyerRut"], input[data-profile-contact-field="rut"], input[data-contact-field="rut"]');
+      return formatRut(input?.value || "");
+    }
+
+    async function copyTextToClipboard(text) {
+      if (!text) return false;
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+        return true;
+      }
+      const helper = document.createElement("textarea");
+      helper.value = text;
+      helper.setAttribute("readonly", "");
+      helper.style.position = "fixed";
+      helper.style.opacity = "0";
+      document.body.appendChild(helper);
+      helper.select();
+      const copied = document.execCommand("copy");
+      helper.remove();
+      return copied;
+    }
+
+    function handleRutLookupClick(event) {
+      const trigger = event.target.closest("[data-rut-lookup-trigger]");
+      const copyButton = event.target.closest("[data-copy-rut]");
+      const box = event.target.closest("[data-rut-lookup]");
+      if (!box || (!trigger && !copyButton)) return;
+
+      const rut = rutValueForLookup(box);
+      const preview = box.querySelector("[data-rut-preview]");
+      if (preview) preview.textContent = rut || "Sin RUT ingresado";
+
+      if (trigger) {
+        const willOpen = !box.classList.contains("open");
+        closeRutPopovers(box);
+        box.classList.toggle("open", willOpen);
+        return;
+      }
+
+      if (copyButton) {
+        if (!rut) {
+          showToast("Ingresa un RUT antes de copiar.");
+          return;
+        }
+        copyTextToClipboard(rut)
+          .then(ok => showToast(ok ? `RUT copiado: ${rut}` : "No se pudo copiar el RUT."))
+          .catch(() => showToast("No se pudo copiar el RUT."));
+      }
     }
 
     function csvEscape(value) {
@@ -4221,6 +4433,13 @@
     });
     document.querySelector("#lawyerRut").addEventListener("blur", event => {
       event.target.value = formatRut(event.target.value);
+    });
+    document.addEventListener("click", event => {
+      if (event.target.closest("[data-rut-lookup]")) {
+        handleRutLookupClick(event);
+        return;
+      }
+      closeRutPopovers();
     });
     document.querySelector("#refreshButton").addEventListener("click", syncFromSheet);
     document.querySelector("#syncButton").addEventListener("click", syncFromSheet);
