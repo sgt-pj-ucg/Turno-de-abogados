@@ -475,6 +475,65 @@
       border-color: #bfc8d6;
     }
 
+    .alert-lawyer-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 16px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .alert-lawyer-head {
+      display: flex;
+      justify-content: space-between;
+      gap: 16px;
+      align-items: flex-start;
+    }
+
+    .alert-lawyer-head h4 {
+      margin: 0 0 4px;
+      font-size: 18px;
+    }
+
+    .alert-lawyer-head p {
+      margin: 0;
+      color: var(--muted);
+    }
+
+    .alert-contact-grid {
+      display: grid;
+      grid-template-columns: repeat(4, minmax(0, 1fr));
+      gap: 10px;
+    }
+
+    .alert-contact-grid > div {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      padding: 10px 12px;
+      min-height: 66px;
+      display: grid;
+      gap: 4px;
+      align-content: start;
+    }
+
+    .alert-contact-grid span {
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 800;
+      letter-spacing: .04em;
+      text-transform: uppercase;
+    }
+
+    .alert-contact-grid strong {
+      overflow-wrap: anywhere;
+    }
+
+    .alert-contact-grid .pending-cell {
+      background: #f5f7fa;
+      border-color: #d8dee8;
+    }
+
     .field-help {
       margin: 0;
       color: var(--muted);
@@ -1488,6 +1547,7 @@
       </div>
       <nav aria-label="Secciones">
         <button class="active" type="button" data-view="search">Buscar abogado</button>
+        <button type="button" data-view="newLawyers">Abogados nuevos</button>
         <button type="button" data-view="newTurn">Nuevo turno</button>
         <button type="button" data-view="alerts">Alertas de información</button>
         <button type="button" data-view="excuses">Excusas y reemplazos</button>
@@ -1570,6 +1630,79 @@
               <span class="badge gold" id="selectedBadge">Seleccione</span>
             </div>
             <div id="lawyerDetail" class="empty">Escribe un nombre y selecciona un abogado para ver contacto, especialidades e historial completo de turnos.</div>
+          </section>
+        </div>
+      </section>
+
+      <section class="view" id="newLawyersView">
+        <div class="grid">
+          <section class="panel">
+            <div class="panel-header">
+              <h3>Ingreso de abogados nuevos</h3>
+              <span class="badge gold">Sin turno histórico</span>
+            </div>
+            <p class="save-note"><strong>Uso recomendado:</strong> registra aquí abogados que deben estar disponibles para búsqueda y ranking, pero que todavía no tienen un turno asignado. No se agregan a la hoja histórica de turnos.</p>
+            <form id="newBaseLawyerForm" class="new-base-lawyer-form" novalidate>
+              <div class="field">
+                <label for="newBaseLawyerRut">RUT abogado(a)</label>
+                <input id="newBaseLawyerRut" inputmode="text" placeholder="12.345.678-5" required>
+                <div class="rut-lookup-box" data-rut-lookup>
+                  <span class="rut-lookup-label">Verificación externa</span>
+                  <button class="rut-lookup-trigger" type="button" data-rut-lookup-trigger>Consultar RUT</button>
+                  <div class="rut-lookup-popover" data-rut-popover>
+                    <h5>Consultar en Poder Judicial</h5>
+                    <p>Copia el RUT y abre la búsqueda oficial. En la página externa solo debes pegarlo y presionar buscar.</p>
+                    <span class="rut-preview-pill" data-rut-preview>Sin RUT ingresado</span>
+                    <div class="rut-popup-actions">
+                      <button type="button" data-copy-rut>Copiar RUT</button>
+                      <a href="https://www.pjud.cl/transparencia/busqueda-de-abogados" target="_blank" rel="noopener">Abrir Poder Judicial</a>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <div class="field">
+                <label for="newBaseLawyerName">Nombre completo</label>
+                <input id="newBaseLawyerName" placeholder="Nombre según registro oficial" required>
+              </div>
+              <div class="form-grid">
+                <div class="field">
+                  <label for="newBaseLawyerEmail">Correo</label>
+                  <input id="newBaseLawyerEmail" type="text" inputmode="email" placeholder="correo@dominio.cl">
+                </div>
+                <div class="field">
+                  <label for="newBaseLawyerPhone">Teléfono</label>
+                  <input id="newBaseLawyerPhone" placeholder="+56 9 1234 5678">
+                </div>
+              </div>
+              <div class="field">
+                <label for="newBaseLawyerAddress">Domicilio</label>
+                <input id="newBaseLawyerAddress" placeholder="Domicilio profesional">
+              </div>
+              <div class="form-grid">
+                <div class="field">
+                  <label for="newBaseLawyerActive">Habilitado para turno</label>
+                  <select id="newBaseLawyerActive">
+                    <option selected>Sí</option>
+                    <option>No</option>
+                  </select>
+                </div>
+                <div class="field">
+                  <label for="newBaseLawyerNotes">Observaciones</label>
+                  <input id="newBaseLawyerNotes" maxlength="160" placeholder="Antecedente breve opcional">
+                </div>
+              </div>
+              <button class="btn primary" id="saveNewBaseLawyerButton" type="submit">Guardar abogado(a) nuevo(a)</button>
+            </form>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <h3>Abogados nuevos disponibles</h3>
+              <span class="badge blue" id="newBaseLawyerCount">0 registros</span>
+            </div>
+            <div class="lawyer-results" id="newBaseLawyerList">
+              <div class="empty">Cuando ingreses abogados nuevos, aparecerán aquí y también en búsqueda/ranking.</div>
+            </div>
           </section>
         </div>
       </section>
@@ -1870,10 +2003,10 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz04bHG89KZ9Va8kKRPyrZa6ra0sI-8vIzGmwrRnBQ6cW5YuArbBWdajPYGtaxB3fhI/exec";
-    const APP_VERSION = "1.4.6-abogado-nuevo";
-    const REQUIRED_SCRIPT_VERSION = "2026-06-22-rut-validado-v12";
+    const APP_VERSION = "1.5.1-abogados-nuevos";
+    const REQUIRED_SCRIPT_VERSION = "2026-06-22-abogados-nuevos-v14";
     const ACCEPTED_SCRIPT_VERSIONS = [
-      "2026-06-22-rut-validado-v12"
+      "2026-06-22-abogados-nuevos-v14"
     ];
     const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
@@ -1886,6 +2019,7 @@
     ];
 
     let turns = [...seedTurns];
+    let newLawyers = [];
     let selectedLawyerKey = "";
     let rankingMinMonths = 0;
     let pendingTurn = null;
@@ -1917,6 +2051,17 @@
       lawyerDetail: document.querySelector("#lawyerDetail"),
       lawyerCount: document.querySelector("#lawyerCount"),
       selectedBadge: document.querySelector("#selectedBadge"),
+      newBaseLawyerForm: document.querySelector("#newBaseLawyerForm"),
+      newBaseLawyerRut: document.querySelector("#newBaseLawyerRut"),
+      newBaseLawyerName: document.querySelector("#newBaseLawyerName"),
+      newBaseLawyerEmail: document.querySelector("#newBaseLawyerEmail"),
+      newBaseLawyerPhone: document.querySelector("#newBaseLawyerPhone"),
+      newBaseLawyerAddress: document.querySelector("#newBaseLawyerAddress"),
+      newBaseLawyerActive: document.querySelector("#newBaseLawyerActive"),
+      newBaseLawyerNotes: document.querySelector("#newBaseLawyerNotes"),
+      saveNewBaseLawyerButton: document.querySelector("#saveNewBaseLawyerButton"),
+      newBaseLawyerList: document.querySelector("#newBaseLawyerList"),
+      newBaseLawyerCount: document.querySelector("#newBaseLawyerCount"),
       rankingSearch: document.querySelector("#rankingSearch"),
       suggestCourt: document.querySelector("#suggestCourt"),
       suggestSubject: document.querySelector("#suggestSubject"),
@@ -2436,34 +2581,52 @@
 
     function groupLawyers() {
       const profiles = new Map();
-      turns.forEach(turn => {
-        const key = personKey(turn);
+      const ensureProfile = record => {
+        const key = personKey(record);
         if (!profiles.has(key)) {
           profiles.set(key, {
             key,
-            name: turn.name,
-            id: turn.id,
-            rut: turn.rut,
-            address: turn.address,
-            phone: turn.phone,
-            email: turn.email,
-            turns: []
+            name: record.name,
+            id: record.id,
+            rut: record.rut,
+            address: record.address,
+            phone: record.phone,
+            email: record.email,
+            turns: [],
+            newLawyerRecords: []
           });
         }
-        const profile = profiles.get(key);
+        return profiles.get(key);
+      };
+
+      turns.forEach(turn => {
+        const profile = ensureProfile(turn);
         profile.turns.push(turn);
         profile.address ||= turn.address;
         profile.phone ||= turn.phone;
         profile.email ||= turn.email;
       });
+
+      newLawyers.forEach(lawyer => {
+        const profile = ensureProfile(lawyer);
+        profile.newLawyerRecords.push(lawyer);
+        profile.name = profile.name || lawyer.name;
+        profile.rut ||= lawyer.rut;
+        profile.address ||= lawyer.address;
+        profile.phone ||= lawyer.phone;
+        profile.email ||= lawyer.email;
+      });
+
       return [...profiles.values()].map(profile => {
         profile.turns.sort((a, b) => parseDate(b.date) - parseDate(a.date));
+        profile.newLawyerRecords.sort((a, b) => parseDate(b.createdAt) - parseDate(a.createdAt));
         profile.performedTurns = profile.turns.filter(turn => countsAsPerformedTurn(turn.status));
-        profile.name = profile.turns[0]?.name || profile.name;
-        profile.rut = profile.turns.find(turn => hasData(turn.rut))?.rut || profile.rut || "";
-        profile.address = profile.turns[0]?.address || profile.address;
-        profile.phone = profile.turns[0]?.phone || profile.phone;
-        profile.email = profile.turns[0]?.email || profile.email;
+        const latestNewLawyer = profile.newLawyerRecords[0] || null;
+        profile.name = profile.turns[0]?.name || latestNewLawyer?.name || profile.name;
+        profile.rut = profile.turns.find(turn => hasData(turn.rut))?.rut || latestNewLawyer?.rut || profile.rut || "";
+        profile.address = profile.turns[0]?.address || latestNewLawyer?.address || profile.address;
+        profile.phone = profile.turns[0]?.phone || latestNewLawyer?.phone || profile.phone;
+        profile.email = profile.turns[0]?.email || latestNewLawyer?.email || profile.email;
         profile.subjects = uniqueValues(profile.performedTurns, "subject");
         profile.courts = uniqueValues(profile.performedTurns, "court");
         profile.lastRecordedTurn = profile.turns[0];
@@ -2471,14 +2634,18 @@
         profile.excuseRecords = profile.turns.filter(turn => isExcuseOrReplacementStatus(turn.status));
         profile.turnsTotal = profile.performedTurns.length;
         profile.recordsTotal = profile.turns.length;
-        profile.active = isActiveValue(profile.lastRecordedTurn?.active);
+        profile.isNewBaseLawyer = Boolean(latestNewLawyer && !profile.lastTurn);
+        profile.active = profile.lastRecordedTurn ? isActiveValue(profile.lastRecordedTurn.active) : isActiveValue(latestNewLawyer?.active || "Sí");
+        profile.baseNotes = latestNewLawyer?.notes || "";
         profile.disableReason = profile.lastRecordedTurn?.disableReason || profile.turns.find(turn => hasData(turn.disableReason))?.disableReason || "";
         profile.disableDocumentUrl = profile.lastRecordedTurn?.disableDocumentUrl || profile.turns.find(turn => hasData(turn.disableDocumentUrl))?.disableDocumentUrl || "";
         profile.monthsWithoutTurn = profile.lastTurn ? monthsSince(profile.lastTurn.date) : 0;
         profile.rankingMonths = profile.lastTurn ? profile.monthsWithoutTurn : 999;
         profile.nameSearchText = normalize([
           profile.name,
-          ...profile.turns.map(turn => turn.name)
+          profile.rut,
+          ...profile.turns.map(turn => turn.name),
+          ...profile.newLawyerRecords.map(lawyer => lawyer.name)
         ].join(" "));
         return profile;
       }).sort((a, b) => a.name.localeCompare(b.name, "es"));
@@ -2571,7 +2738,7 @@
           <strong>${escapeHtml(profile.name)}</strong>
           <span class="muted">RUT: ${escapeHtml(profile.rut ? formatRut(profile.rut) : "Sin RUT registrado")}</span>
           <span class="muted">${escapeHtml(profile.email || profile.phone || "Sin contacto registrado")}</span>
-          <span class="muted">${profile.turnsTotal} turno${profile.turnsTotal === 1 ? "" : "s"} realizado${profile.turnsTotal === 1 ? "" : "s"} · Último realizado: ${profile.lastTurn ? escapeHtml(profile.lastTurn.month + " " + profile.lastTurn.year) : "Sin registro"}</span>
+          <span class="muted">${profile.isNewBaseLawyer ? "Abogado(a) nuevo(a), sin turno realizado" : `${profile.turnsTotal} turno${profile.turnsTotal === 1 ? "" : "s"} realizado${profile.turnsTotal === 1 ? "" : "s"} · Último realizado: ${profile.lastTurn ? escapeHtml(profile.lastTurn.month + " " + profile.lastTurn.year) : "Sin registro"}`}</span>
         </button>
       `).join("");
     }
@@ -2597,7 +2764,9 @@
         els.lawyerDetail.innerHTML = "Selecciona un abogado de la lista para revisar su información.";
         return;
       }
-      els.selectedBadge.textContent = `${profile.turnsTotal} turnos realizados`;
+      els.selectedBadge.textContent = profile.isNewBaseLawyer
+        ? "Abogado(a) nuevo(a)"
+        : `${profile.turnsTotal} turnos realizados`;
       els.lawyerDetail.className = "profile";
       const specialties = topSubjects(profile);
       const missingIssues = contactIssues(profile);
@@ -2609,6 +2778,7 @@
           <div>
             <h3>${escapeHtml(profile.name)}</h3>
             <p class="muted">${monthsText} · Último turno realizado: ${lastTurnText}</p>
+            ${profile.isNewBaseLawyer ? `<span class="badge blue">Base Abogados nuevos · sin turno histórico</span>` : ""}
           </div>
           <div class="status-control">
             <span class="badge green">Especialidad sugerida: ${escapeHtml(specialties[0] || "Sin historial")}</span>
@@ -2976,7 +3146,9 @@
         ? `${profile.monthsWithoutTurn} meses sin turno`
         : (profile.excuseRecords || []).length
           ? "registra excusas o reemplazos, pero ningún turno realizado"
-          : "abogado(a) nuevo(a), sin registro de turno realizado"];
+          : profile.isNewBaseLawyer
+            ? "ingresado en base Abogados nuevos, sin turno realizado"
+            : "abogado(a) nuevo(a), sin registro de turno realizado"];
       if (subject && profile.subjects.includes(subject)) reasons.push(`ha trabajado materia ${subject}`);
       if (court && profile.courts.includes(court)) reasons.push(`registra turnos en ${court}`);
       if (profile.turnsTotal > 1) reasons.push(`${profile.turnsTotal} turnos realizados, con penalización por repetición`);
@@ -3444,6 +3616,7 @@
       renderAlerts();
       nextMonthLabel();
       renderLawyerResults();
+      renderNewBaseLawyers();
       if (selectedLawyerKey) {
         renderLawyerDetail(groupLawyers().find(profile => profile.key === selectedLawyerKey));
       }
@@ -3453,16 +3626,49 @@
       renderMonthlyTurns();
     }
 
+    function renderNewBaseLawyers() {
+      if (!els.newBaseLawyerList || !els.newBaseLawyerCount) return;
+      const profiles = groupLawyers()
+        .filter(profile => profile.isNewBaseLawyer)
+        .sort((a, b) => a.name.localeCompare(b.name, "es"));
+      els.newBaseLawyerCount.textContent = `${profiles.length} registro${profiles.length === 1 ? "" : "s"}`;
+      if (!profiles.length) {
+        els.newBaseLawyerList.innerHTML = `<div class="empty">Aún no hay abogados registrados en la pestaña Abogados nuevos.</div>`;
+        return;
+      }
+      els.newBaseLawyerList.innerHTML = profiles.map(profile => `
+        <article class="alert-lawyer-card">
+          <div class="alert-lawyer-head">
+            <div>
+              <h4>${escapeHtml(profile.name)}</h4>
+              <p>Abogado(a) nuevo(a), sin turno realizado.</p>
+            </div>
+            <span class="badge ${profile.active ? "blue" : "red"}">${profile.active ? "Disponible ranking" : "No habilitado"}</span>
+          </div>
+          <div class="alert-contact-grid">
+            <div class="${hasData(profile.rut) ? "" : "pending-cell"}"><span>RUT</span><strong>${displayValue(profile.rut ? formatRut(profile.rut) : "")}</strong></div>
+            <div class="${hasData(profile.email) ? "" : "pending-cell"}"><span>Correo</span><strong>${displayValue(profile.email)}</strong></div>
+            <div class="${hasData(profile.phone) ? "" : "pending-cell"}"><span>Teléfono</span><strong>${displayValue(profile.phone)}</strong></div>
+            <div class="${hasData(profile.address) ? "" : "pending-cell"}"><span>Domicilio</span><strong>${displayValue(profile.address)}</strong></div>
+          </div>
+          ${profile.baseNotes ? `<p class="save-note">${escapeHtml(profile.baseNotes)}</p>` : ""}
+        </article>
+      `).join("");
+    }
+
     function showView(view) {
       document.querySelectorAll(".view").forEach(section => section.classList.remove("active"));
       document.querySelector(`#${view}View`).classList.add("active");
       document.querySelectorAll("nav button").forEach(button => button.classList.toggle("active", button.dataset.view === view));
       const isNewTurn = view === "newTurn";
+      const isNewLawyers = view === "newLawyers";
       const isAlerts = view === "alerts";
       const isExcuses = view === "excuses";
       const isTurns = view === "turns";
       document.querySelector("#pageTitle").textContent = isNewTurn
         ? "Generar y registrar nuevo turno"
+        : isNewLawyers
+          ? "Abogados nuevos"
         : isAlerts
           ? "Alertas de información"
           : isExcuses
@@ -3472,6 +3678,8 @@
               : "Consulta institucional de abogados";
       document.querySelector("#pageSubtitle").textContent = isNewTurn
         ? "Revisa el ranking por meses sin turno, especialidades históricas y registra una nueva asignación."
+        : isNewLawyers
+          ? "Ingresa abogados que aún no tienen turnos históricos sin alterar la base de turnos registrados."
         : isAlerts
           ? "Revisa datos faltantes, abogados excluidos del ranking y calidad de contacto."
           : isExcuses
@@ -3496,7 +3704,7 @@
 
     function rutValueForLookup(box) {
       const field = box.closest(".field") || box.parentElement;
-      const input = field?.querySelector('input[id="lawyerRut"], input[data-profile-contact-field="rut"], input[data-contact-field="rut"]');
+      const input = field?.querySelector('input[id="lawyerRut"], input[id="newBaseLawyerRut"], input[data-profile-contact-field="rut"], input[data-contact-field="rut"]');
       return formatRut(input?.value || "");
     }
 
@@ -3640,6 +3848,32 @@
       }).filter(turn => turn.name && turn.date);
     }
 
+    function mapNewLawyersRows(headersRaw, rows) {
+      const headers = headersRaw.map(normalize);
+      const findHeader = keys => headers.findIndex(header => keys.some(key => header.includes(key)));
+      return rows.map((cols, rowIndex) => {
+        const pick = (...keys) => {
+          const index = findHeader(keys.map(normalize));
+          return index >= 0 ? String(cols[index] ?? "").trim() : "";
+        };
+        const createdAt = pick("fecha ingreso", "fecha", "creado") || new Date().toISOString();
+        return {
+          rowNumber: rowIndex + 2,
+          source: "Abogados nuevos",
+          entryMode: "Abogado(a) nuevo(a)",
+          id: pick("id"),
+          createdAt,
+          name: pick("abogado", "abogado(a)", "nombre"),
+          rut: formatRut(pick("rut abogado", "rut abogado(a)", "rut", "run")),
+          address: pick("domicilio", "direccion", "dirección"),
+          phone: pick("fono", "telefono", "teléfono"),
+          email: pick("email", "correo"),
+          active: pick("habilitado turno", "activo") || "Sí",
+          notes: pick("observaciones", "nota", "motivo") || "Abogado(a) nuevo(a), sin registro de turno realizado."
+        };
+      }).filter(lawyer => lawyer.name);
+    }
+
     function sheetUrlForGviz() {
       return SHEET_CSV_URL
         .replace("/export?format=csv&", "/gviz/tq?tqx=out:json&")
@@ -3667,7 +3901,7 @@
                     return cell.f ?? cell.v ?? "";
                   }));
                   cleanup();
-                  resolve([headers, ...rows]);
+                  resolve({ rows: [headers, ...rows], newLawyers: [] });
                 } catch (error) {
                   cleanup();
                   reject(error);
@@ -3704,7 +3938,10 @@
         window[callbackName] = payload => {
           cleanup();
           if (payload && payload.ok && Array.isArray(payload.rows) && payload.rows.length > 1) {
-            resolve(payload.rows);
+            resolve({
+              rows: payload.rows,
+              newLawyers: Array.isArray(payload.newLawyers) ? payload.newLawyers : []
+            });
           } else {
             reject(new Error("Apps Script no devolvió filas válidas."));
           }
@@ -3738,7 +3975,7 @@
         const csv = await response.text();
         const rows = parseCsv(csv);
         if (rows.length < 10) throw new Error("La respuesta CSV no contiene registros suficientes.");
-        return rows;
+        return { rows, newLawyers: [] };
       } catch (error) {
         console.warn("No se pudo leer CSV; se probará Apps Script.", error);
       }
@@ -3749,14 +3986,20 @@
     async function syncFromSheet(options = {}) {
       showToast("Sincronizando planilla...");
       const keepSelectedKey = options.keepSelected ? selectedLawyerKey : "";
-      const [headersRaw, ...rows] = await loadSheetRows();
+      const sheetData = await loadSheetRows();
+      const mainRows = Array.isArray(sheetData) ? sheetData : sheetData.rows;
+      const [headersRaw, ...rows] = mainRows;
       const loadedTurns = mapRowsToTurns(headersRaw, rows);
       if (loadedTurns.length < 10) throw new Error("La planilla no devolvió registros válidos.");
+      const newLawyerRows = Array.isArray(sheetData?.newLawyers) ? sheetData.newLawyers : [];
       turns = loadedTurns;
+      newLawyers = newLawyerRows.length > 1
+        ? mapNewLawyersRows(newLawyerRows[0], newLawyerRows.slice(1))
+        : [];
       selectedLawyerKey = keepSelectedKey;
       renderAll();
       renderLawyerDetail(keepSelectedKey ? groupLawyers().find(profile => profile.key === keepSelectedKey) : null);
-      showToast(`Datos sincronizados: ${turns.length} turnos, ${groupLawyers().length} abogados.`);
+      showToast(`Datos sincronizados: ${turns.length} turnos, ${groupLawyers().length} abogados, ${newLawyers.length} nuevos.`);
     }
 
     function checkAppsScriptVersion() {
@@ -3840,6 +4083,46 @@
 
         const params = new URLSearchParams({
           action: "append",
+          callback: callbackName,
+          payload: JSON.stringify(payload)
+        });
+        script.src = `${GOOGLE_APPS_SCRIPT_URL}?${params.toString()}`;
+        document.head.appendChild(script);
+      });
+    }
+
+    function saveNewBaseLawyerToGoogleSheet(lawyer) {
+      if (!GOOGLE_APPS_SCRIPT_URL) return Promise.resolve({ ok: false, message: "No hay Apps Script configurado." });
+      const payload = { ...lawyer, actorToken: currentSessionToken() };
+      return new Promise(resolve => {
+        const callbackName = `newLawyerSave_${Date.now()}_${Math.round(Math.random() * 100000)}`;
+        const script = document.createElement("script");
+        const timer = window.setTimeout(() => {
+          cleanup();
+          resolve({ ok: false, message: "Apps Script no respondió al guardar abogado(a) nuevo(a)." });
+        }, 12000);
+
+        function cleanup() {
+          window.clearTimeout(timer);
+          script.remove();
+          delete window[callbackName];
+        }
+
+        window[callbackName] = response => {
+          cleanup();
+          resolve({
+            ok: Boolean(response && response.ok),
+            message: response?.message || (response?.ok ? "Abogado(a) nuevo(a) guardado." : "No se pudo guardar.")
+          });
+        };
+
+        script.onerror = () => {
+          cleanup();
+          resolve({ ok: false, message: "No se pudo conectar con Apps Script." });
+        };
+
+        const params = new URLSearchParams({
+          action: "appendnewlawyer",
           callback: callbackName,
           payload: JSON.stringify(payload)
         });
@@ -4280,6 +4563,73 @@
       }
     }
 
+    async function handleNewBaseLawyerSubmit(event) {
+      event.preventDefault();
+      if (!requireAuthenticatedUser()) return;
+
+      const lawyer = {
+        rut: formatRut(els.newBaseLawyerRut.value.trim()),
+        name: els.newBaseLawyerName.value.trim(),
+        email: els.newBaseLawyerEmail.value.trim(),
+        phone: els.newBaseLawyerPhone.value.trim(),
+        address: els.newBaseLawyerAddress.value.trim(),
+        active: els.newBaseLawyerActive.value || "Sí",
+        notes: els.newBaseLawyerNotes.value.trim()
+      };
+
+      if (!lawyer.rut || !lawyer.name) {
+        showToast("Ingresa RUT y nombre del abogado(a) nuevo(a).");
+        return;
+      }
+      if (!isValidRut(lawyer.rut)) {
+        showToast("El RUT del abogado(a) no es válido.");
+        els.newBaseLawyerRut.focus();
+        return;
+      }
+
+      const contactValidation = validateContact(lawyer);
+      if (contactValidation.errors.length) {
+        showToast(contactValidation.errors[0]);
+        return;
+      }
+
+      const exists = groupLawyers().find(profile =>
+        normalizeRut(profile.rut) === normalizeRut(lawyer.rut) ||
+        normalize(profile.name) === normalize(lawyer.name)
+      );
+      if (exists && !confirm(`Ya existe un registro para ${exists.name}. ¿Deseas continuar de todas formas?`)) return;
+
+      els.saveNewBaseLawyerButton.disabled = true;
+      els.saveNewBaseLawyerButton.textContent = "Guardando...";
+      showToast("Guardando abogado(a) nuevo(a)...");
+      const response = await saveNewBaseLawyerToGoogleSheet(lawyer).catch(error => ({
+        ok: false,
+        message: error?.message || "No se pudo guardar el abogado(a) nuevo(a)."
+      }));
+      els.saveNewBaseLawyerButton.disabled = false;
+      els.saveNewBaseLawyerButton.textContent = "Guardar abogado(a) nuevo(a)";
+
+      if (!response.ok) {
+        showToast(response.message || "No se pudo guardar el abogado(a) nuevo(a).");
+        return;
+      }
+
+      newLawyers.push({
+        ...lawyer,
+        id: "",
+        createdAt: new Date().toISOString(),
+        source: "Abogados nuevos",
+        entryMode: "Abogado(a) nuevo(a)",
+        notes: lawyer.notes || "Abogado(a) nuevo(a), sin registro de turno realizado."
+      });
+      els.newBaseLawyerForm.reset();
+      els.newBaseLawyerActive.value = "Sí";
+      selectedLawyerKey = "";
+      renderAll();
+      showToast("Abogado(a) nuevo(a) guardado y disponible para búsqueda/ranking.");
+      syncFromSheet().catch(() => renderAll());
+    }
+
     document.querySelector("#turnForm").addEventListener("submit", async event => {
       event.preventDefault();
       const monthValue = document.querySelector("#turnDate").value;
@@ -4563,6 +4913,13 @@
     els.loginRut.addEventListener("input", syncRutFormat);
     els.loginRut.addEventListener("blur", syncRutFormat);
     els.logoutButton.addEventListener("click", logoutUser);
+    els.newBaseLawyerForm.addEventListener("submit", handleNewBaseLawyerSubmit);
+    els.newBaseLawyerRut.addEventListener("input", event => {
+      event.target.value = formatRut(event.target.value);
+    });
+    els.newBaseLawyerRut.addEventListener("blur", event => {
+      event.target.value = formatRut(event.target.value);
+    });
     document.querySelectorAll("nav button").forEach(button => {
       button.addEventListener("click", () => showView(button.dataset.view));
     });
