@@ -787,23 +787,47 @@
       gap: 10px;
     }
 
-    .monthly-turns tr.replacement-row {
-      background: #fff8e1;
-      box-shadow: inset 4px 0 0 #c7942a;
+    .monthly-table {
+      table-layout: fixed;
+      min-width: 1240px;
     }
 
-    .monthly-turns tr.replacement-row td {
-      border-bottom-color: #f1d99a;
+    .monthly-table th,
+    .monthly-table td {
+      padding: 10px 12px;
+      vertical-align: top;
     }
 
-    .monthly-turns tr.replacement-row .turn-person strong {
-      color: #7a581a;
+    .monthly-table .col-subject { width: 12%; }
+    .monthly-table .col-court { width: 16%; }
+    .monthly-table .col-lawyer { width: 19%; }
+    .monthly-table .col-de { width: 9%; }
+    .monthly-table .col-contact { width: 26%; }
+    .monthly-table .col-status { width: 13%; }
+    .monthly-table .col-notes { width: 15%; }
+
+    .monthly-table .badge {
+      max-width: 100%;
+      white-space: normal;
+      text-align: center;
+      line-height: 1.2;
+    }
+
+    .turn-subject-badge {
+      justify-content: flex-start;
+      text-align: left;
+    }
+
+    .turn-de {
+      color: var(--ink);
+      font-size: 13px;
+      line-height: 1.25;
+      white-space: nowrap;
     }
 
     .turn-person {
       display: grid;
       gap: 4px;
-      min-width: 210px;
     }
 
     .turn-person strong {
@@ -816,7 +840,6 @@
       color: #475467;
       font-size: 12px;
       line-height: 1.35;
-      min-width: 230px;
     }
 
     .turn-note {
@@ -829,7 +852,6 @@
     .turn-state {
       display: grid;
       gap: 6px;
-      min-width: 145px;
     }
 
     .rank-controls {
@@ -1632,7 +1654,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwn4_3EE7QDNDbuLrykB645ssRSfvVXdJWZZNtMNpu-PrPMH_iPoCAIGyRQH1dwDpsQ/exec";
-    const APP_VERSION = "1.3.1-reemplazos-decreto";
+    const APP_VERSION = "1.3.2-turnos-tabla-ajustada";
     const REQUIRED_SCRIPT_VERSION = "2026-06-20-turn-status-v10";
     const ACCEPTED_SCRIPT_VERSIONS = [
       "2026-06-20-turn-status-v10"
@@ -2965,7 +2987,16 @@
 
       els.monthlyTurnResults.innerHTML = `
         <div class="table-wrap">
-          <table>
+          <table class="monthly-table">
+            <colgroup>
+              <col class="col-subject">
+              <col class="col-court">
+              <col class="col-lawyer">
+              <col class="col-de">
+              <col class="col-contact">
+              <col class="col-status">
+              <col class="col-notes">
+            </colgroup>
             <thead>
               <tr>
                 <th>Materia</th>
@@ -2981,8 +3012,8 @@
               ${displayedTurns.map(turn => {
                 const type = turnStatusType(turn);
                 return `
-                <tr class="${type === "replacement" ? "replacement-row" : ""}">
-                  <td><span class="badge gold">${escapeHtml(turn.subject || "Sin materia")}</span></td>
+                <tr>
+                  <td><span class="badge gold turn-subject-badge">${escapeHtml(turn.subject || "Sin materia")}</span></td>
                   <td>${displayValue(turn.court)}</td>
                   <td>
                     <div class="turn-person">
@@ -2990,7 +3021,7 @@
                       <span class="muted">${escapeHtml(turn.month)} ${escapeHtml(turn.year)}</span>
                     </div>
                   </td>
-                  <td>${displayValue(extractDeNumber(turn))}</td>
+                  <td><div class="turn-de">${displayValue(extractDeNumber(turn))}</div></td>
                   <td>
                     <div class="turn-contact">
                       <span><strong>Correo:</strong> ${displayValue(turn.email)}</span>
@@ -3002,7 +3033,6 @@
                     <div class="turn-state">
                       <span class="badge ${type === "replacement" ? "gold" : statusBadgeClass(turn.status)}">${escapeHtml(type === "replacement" && !statusKey(turn.status).includes("reemplaz") ? "Reemplazante vigente" : (turn.status || "Sin estado"))}</span>
                       ${type === "excused" ? `<span class="muted">No cuenta como turno realizado</span>` : ""}
-                      ${type === "replacement" ? `<span class="muted">Reemplazante</span>` : ""}
                     </div>
                   </td>
                   <td><div class="turn-note">${displayValue(turn.notes)}</div></td>
