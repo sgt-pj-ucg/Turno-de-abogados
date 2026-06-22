@@ -1164,6 +1164,31 @@
       line-height: 1.45;
     }
 
+    .new-lawyer-note {
+      display: none;
+      margin: 0 18px 16px;
+      border: 1px solid #ead39a;
+      border-radius: 8px;
+      padding: 12px;
+      background: #fff8e6;
+      color: #6d4f11;
+      font-size: 13px;
+      line-height: 1.4;
+      font-weight: 800;
+    }
+
+    .new-lawyer-note.visible {
+      display: block;
+    }
+
+    .new-lawyer-note span {
+      display: block;
+      margin-top: 4px;
+      color: var(--muted);
+      font-size: 12px;
+      font-weight: 600;
+    }
+
     .alert-grid {
       padding: 18px;
       display: grid;
@@ -1604,6 +1629,10 @@
               <button class="btn success" id="newLawyerButton" type="button">Nuevo abogado(a)</button>
             </div>
             <p class="save-note"><strong>Importante:</strong> Puedes usar un abogado(a) del ranking o presionar <strong>Nuevo abogado(a)</strong> para ingresar datos manualmente. Tribunal y materia siempre son editables y muestran opciones disponibles desde la planilla.</p>
+            <p class="new-lawyer-note" id="newLawyerModeNote">
+              Modo abogado(a) nuevo(a) activado.
+              <span>Completa RUT, contacto, tribunal, materia y mes. Quedará habilitado por defecto y se identificará como abogado(a) sin turno realizado hasta que exista un turno efectivo.</span>
+            </p>
             <p class="last-save" id="lastSaveStatus"></p>
             <form id="turnForm" novalidate>
               <div class="field">
@@ -1841,7 +1870,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz04bHG89KZ9Va8kKRPyrZa6ra0sI-8vIzGmwrRnBQ6cW5YuArbBWdajPYGtaxB3fhI/exec";
-    const APP_VERSION = "1.4.5-popup-rut-demo";
+    const APP_VERSION = "1.4.6-abogado-nuevo";
     const REQUIRED_SCRIPT_VERSION = "2026-06-22-rut-validado-v12";
     const ACCEPTED_SCRIPT_VERSIONS = [
       "2026-06-22-rut-validado-v12"
@@ -1866,6 +1895,7 @@
     let historySort = { key: "date", direction: "desc" };
     let pendingDisableResolver = null;
     let authenticatedUser = null;
+    let turnFormMode = "existing";
     const selectedProposalKeys = new Set();
 
     const els = {
@@ -1928,6 +1958,7 @@
       cancelDisable: document.querySelector("#cancelDisable"),
       acceptDisable: document.querySelector("#acceptDisable"),
       lastSaveStatus: document.querySelector("#lastSaveStatus"),
+      newLawyerModeNote: document.querySelector("#newLawyerModeNote"),
       backTop: document.querySelector("#backTop"),
       backBottom: document.querySelector("#backBottom"),
       toast: document.querySelector("#toast")
@@ -2471,13 +2502,13 @@
     function noPerformedLabel(profile) {
       if (profile.lastTurn) return "";
       if ((profile.excuseRecords || []).length) return "Solo excusas";
-      return "Sin turno";
+      return "Nuevo";
     }
 
     function noPerformedCaption(profile) {
       if (profile.lastTurn) return "meses sin turno";
       if ((profile.excuseRecords || []).length) return "sin turno efectivo";
-      return "realizado";
+      return "sin turno realizado";
     }
 
     function topSubjects(profile) {
@@ -2945,7 +2976,7 @@
         ? `${profile.monthsWithoutTurn} meses sin turno`
         : (profile.excuseRecords || []).length
           ? "registra excusas o reemplazos, pero ningún turno realizado"
-          : "sin turnos realizados"];
+          : "abogado(a) nuevo(a), sin registro de turno realizado"];
       if (subject && profile.subjects.includes(subject)) reasons.push(`ha trabajado materia ${subject}`);
       if (court && profile.courts.includes(court)) reasons.push(`registra turnos en ${court}`);
       if (profile.turnsTotal > 1) reasons.push(`${profile.turnsTotal} turnos realizados, con penalización por repetición`);
@@ -3017,6 +3048,8 @@
     function useCandidate(key) {
       const profile = groupLawyers().find(item => item.key === key);
       if (!profile) return;
+      turnFormMode = "existing";
+      els.newLawyerModeNote.classList.remove("visible");
       const subject = els.suggestSubject.value || "";
       const court = els.suggestCourt.value || "";
       const subjectInput = document.querySelector("#subjectInput");
@@ -3040,13 +3073,17 @@
 
     function startNewLawyerEntry() {
       const form = document.querySelector("#turnForm");
+      turnFormMode = "new";
       form.reset();
       document.querySelector("#enabledInput").value = "Sí";
       document.querySelector("#statusInput").value = "Programado";
+      document.querySelector("#turnDate").value = nextMonthValue();
+      document.querySelector("#notesInput").value = "Abogado(a) nuevo(a), sin registro de turno realizado.";
+      els.newLawyerModeNote.classList.add("visible");
       document.querySelector("#subjectInput").readOnly = false;
       document.querySelector("#courtInput").readOnly = false;
       document.querySelector("#lawyerName").focus();
-      showToast("Formulario libre para ingresar un nuevo abogado(a).");
+      showToast("Modo abogado(a) nuevo(a): completa RUT y datos de contacto antes de guardar.");
     }
 
     function clearAndFocusTurnField(selector, label) {
@@ -4187,6 +4224,7 @@
       els.confirmBody.innerHTML = `
         <div class="summary-grid">
           <div class="info-box"><span>Abogado(a)</span><strong>${escapeHtml(turn.name)}</strong></div>
+          <div class="info-box"><span>Tipo de ingreso</span><strong>${escapeHtml(turn.entryMode || "Turno regular")}</strong></div>
           <div class="info-box"><span>RUT</span><strong>${displayValue(turn.rut)}</strong></div>
           <div class="info-box"><span>Materia</span><strong>${escapeHtml(turn.subject)}</strong></div>
           <div class="info-box"><span>Tribunal</span><strong>${escapeHtml(turn.court)}</strong></div>
@@ -4223,6 +4261,8 @@
       turns.push(turn);
       const savedToSheet = await saveTurnToGoogleSheet(turn).catch(() => false);
       document.querySelector("#turnForm").reset();
+      turnFormMode = "existing";
+      els.newLawyerModeNote.classList.remove("visible");
       saveButton.disabled = false;
       saveButton.textContent = "Guardar abogado(a)";
 
@@ -4273,14 +4313,37 @@
         (!courtValue ? document.querySelector("#courtInput") : document.querySelector("#subjectInput")).focus();
         return;
       }
+      if (turnFormMode === "new") {
+        const normalizedName = normalize(lawyerName);
+        const normalizedRut = normalizeRut(lawyerRut);
+        const existingProfile = groupLawyers().find(profile => {
+          const sameName = normalize(profile.name) === normalizedName;
+          const sameRut = profile.rut && normalizeRut(profile.rut) === normalizedRut;
+          return sameName || sameRut;
+        });
+        if (existingProfile) {
+          const shouldContinue = window.confirm(
+            `Ya existe un registro para ${existingProfile.name}.\n\n` +
+            "Si se trata de la misma persona, conviene usar la ficha existente o seleccionarla desde el ranking.\n\n" +
+            "¿Deseas continuar de todos modos como nuevo ingreso?"
+          );
+          if (!shouldContinue) return;
+        }
+      }
 
       showToast("Revisa el resumen antes de guardar.");
       const saveButton = document.querySelector("#saveLawyerButton");
       saveButton.disabled = true;
       saveButton.textContent = "Revisando...";
+      const formNotes = document.querySelector("#notesInput").value.trim();
+      const newLawyerNote = "Abogado(a) nuevo(a), sin registro de turno realizado.";
+      const finalNotes = turnFormMode === "new" && !normalize(formNotes).includes(normalize(newLawyerNote))
+        ? [newLawyerNote, formNotes].filter(Boolean).join(" ")
+        : formNotes;
       const newTurn = {
         name: lawyerName,
-        source: "Formulario web abogados de turno",
+        source: turnFormMode === "new" ? "Formulario web - abogado nuevo" : "Formulario web abogados de turno",
+        entryMode: turnFormMode === "new" ? "Abogado(a) nuevo(a)" : "Turno regular",
         id: "",
         rut: lawyerRut,
         address: document.querySelector("#lawyerAddress").value.trim(),
@@ -4293,7 +4356,7 @@
         month: monthFmt.format(parseDate(`${monthValue}-01`)).split(" de ")[0],
         status: document.querySelector("#statusInput").value,
         active: document.querySelector("#enabledInput").value || "Sí",
-        notes: document.querySelector("#notesInput").value.trim()
+        notes: finalNotes
       };
       pendingTurn = newTurn;
       saveButton.disabled = false;
