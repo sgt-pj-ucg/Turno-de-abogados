@@ -781,6 +781,12 @@
       padding: 0 18px 18px;
     }
 
+    .period-picker {
+      display: grid;
+      grid-template-columns: minmax(110px, .75fr) minmax(145px, 1fr);
+      gap: 10px;
+    }
+
     .monthly-turns tr.replacement-row {
       background: #fff8e1;
       box-shadow: inset 4px 0 0 #c7942a;
@@ -1226,7 +1232,7 @@
       .actions { justify-content: stretch; }
       .actions .btn { flex: 1; }
       .contact-toolbar { align-items: flex-start; flex-direction: column; }
-      .metrics, .contact-grid, .summary-grid, .form-grid, .rank-controls, .alert-grid, .alert-edit-grid, .document-row { grid-template-columns: 1fr; }
+      .metrics, .contact-grid, .summary-grid, .form-grid, .rank-controls, .alert-grid, .alert-edit-grid, .document-row, .period-picker { grid-template-columns: 1fr; }
       .rank-search { grid-column: span 1; }
       .alert-edit-grid .btn { min-height: 48px; }
       .panel-header { align-items: flex-start; flex-direction: column; }
@@ -1544,8 +1550,11 @@
           </div>
           <div class="rank-controls">
             <div class="field">
-              <label for="monthlyTurnPeriod">Año y mes</label>
-              <input id="monthlyTurnPeriod" type="month">
+              <label for="monthlyTurnYear">Año y mes</label>
+              <div class="period-picker">
+                <select id="monthlyTurnYear" aria-label="Año del turno"></select>
+                <select id="monthlyTurnMonth" aria-label="Mes del turno"></select>
+              </div>
             </div>
             <div class="field rank-search">
               <label for="monthlyTurnSearch">Buscar dentro del turno</label>
@@ -1623,7 +1632,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwn4_3EE7QDNDbuLrykB645ssRSfvVXdJWZZNtMNpu-PrPMH_iPoCAIGyRQH1dwDpsQ/exec";
-    const APP_VERSION = "1.2.9-script-actualizado";
+    const APP_VERSION = "1.3.1-reemplazos-decreto";
     const REQUIRED_SCRIPT_VERSION = "2026-06-20-turn-status-v10";
     const ACCEPTED_SCRIPT_VERSIONS = [
       "2026-06-20-turn-status-v10"
@@ -1688,7 +1697,8 @@
       excuseDeNumber: document.querySelector("#excuseDeNumber"),
       excuseNotes: document.querySelector("#excuseNotes"),
       excuseReplacementButton: document.querySelector("#excuseReplacementButton"),
-      monthlyTurnPeriod: document.querySelector("#monthlyTurnPeriod"),
+      monthlyTurnYear: document.querySelector("#monthlyTurnYear"),
+      monthlyTurnMonth: document.querySelector("#monthlyTurnMonth"),
       monthlyTurnSearch: document.querySelector("#monthlyTurnSearch"),
       monthlyTurnStatus: document.querySelector("#monthlyTurnStatus"),
       refreshMonthlyTurns: document.querySelector("#refreshMonthlyTurns"),
@@ -1716,6 +1726,20 @@
 
     const dateFmt = new Intl.DateTimeFormat("es-CL", { day: "2-digit", month: "short", year: "numeric" });
     const monthFmt = new Intl.DateTimeFormat("es-CL", { month: "long", year: "numeric" });
+    const MONTH_OPTIONS = [
+      ["01", "Enero"],
+      ["02", "Febrero"],
+      ["03", "Marzo"],
+      ["04", "Abril"],
+      ["05", "Mayo"],
+      ["06", "Junio"],
+      ["07", "Julio"],
+      ["08", "Agosto"],
+      ["09", "Septiembre"],
+      ["10", "Octubre"],
+      ["11", "Noviembre"],
+      ["12", "Diciembre"]
+    ];
 
     function escapeHtml(value) {
       return String(value ?? "").replace(/[&<>"']/g, char => ({
@@ -2095,7 +2119,7 @@
     function statusBadgeClass(status) {
       const key = statusKey(status);
       if (key.includes("excus") || key.includes("reemplazad") || key.includes("anulad")) return "red";
-      if (key.includes("reemplazo")) return "gold";
+      if (key.includes("reemplazo") || key.includes("reemplazante")) return "gold";
       if (key.includes("programad") || key.includes("reagend")) return "blue";
       return "green";
     }
@@ -2800,20 +2824,81 @@
       return periods[0] || nextMonthValue();
     }
 
+    function monthlyTurnYearOptions() {
+      const currentYear = new Date().getFullYear();
+      const years = new Set([String(currentYear), String(currentYear + 1)]);
+      turns.forEach(turn => {
+        const year = String(turn.date || "").slice(0, 4);
+        if (/^\d{4}$/.test(year)) years.add(year);
+      });
+      return [...years].sort((a, b) => Number(b) - Number(a));
+    }
+
+    function populateMonthlyPeriodControls() {
+      if (!els.monthlyTurnYear || !els.monthlyTurnMonth) return;
+      const years = monthlyTurnYearOptions();
+      const yearSignature = years.join("|");
+      if (els.monthlyTurnYear.dataset.signature !== yearSignature) {
+        const selectedYear = els.monthlyTurnYear.value;
+        els.monthlyTurnYear.innerHTML = years.map(year => `<option value="${year}">${year}</option>`).join("");
+        els.monthlyTurnYear.dataset.signature = yearSignature;
+        if (years.includes(selectedYear)) els.monthlyTurnYear.value = selectedYear;
+      }
+
+      if (!els.monthlyTurnMonth.dataset.ready) {
+        els.monthlyTurnMonth.innerHTML = MONTH_OPTIONS.map(([value, label]) => `<option value="${value}">${label}</option>`).join("");
+        els.monthlyTurnMonth.dataset.ready = "true";
+      }
+    }
+
+    function setMonthlyPeriod(period) {
+      populateMonthlyPeriodControls();
+      const safePeriod = /^\d{4}-\d{2}$/.test(period || "") ? period : latestTurnPeriod();
+      const [year, month] = safePeriod.split("-");
+      if (els.monthlyTurnYear) {
+        els.monthlyTurnYear.value = year;
+        els.monthlyTurnYear.dataset.initialized = "true";
+      }
+      if (els.monthlyTurnMonth) {
+        els.monthlyTurnMonth.value = month;
+        els.monthlyTurnMonth.dataset.initialized = "true";
+      }
+    }
+
+    function selectedMonthlyPeriod() {
+      populateMonthlyPeriodControls();
+      if (els.monthlyTurnYear?.dataset.initialized !== "true" || !els.monthlyTurnYear?.value || !els.monthlyTurnMonth?.value) {
+        setMonthlyPeriod(latestTurnPeriod());
+      }
+      return `${els.monthlyTurnYear.value}-${els.monthlyTurnMonth.value}`;
+    }
+
     function turnStatusType(turn) {
       const key = statusKey(turn.status);
-      if (key.includes("realizado por reemplazo")) return "replacement";
+      const notesKey = normalize(turn.notes || "");
+      const combined = `${key} ${notesKey}`;
+      if (combined.includes("abogado reemplazante") || combined.includes("reemplazante vigente") || combined.includes("realizado por reemplazo")) return "replacement";
       if (key.includes("excus") || key.includes("original reemplaz") || key.includes("reemplazad")) return "excused";
-      if (key.includes("reemplazo")) return "replacement";
+      if (key.includes("reemplazo") || key.includes("reemplazante")) return "replacement";
       return "active";
     }
 
     function extractDeNumber(turn) {
-      const text = String(turn.notes || "");
-      const match = text.match(/(?:D\.?\s*E\.?|Documento|Decreto\s+Econ[oó]mico)\s*(?:N[°ºo.]*)?\s*[:\-]?\s*([A-Za-z0-9./\-]+(?:\s*-\s*\d{2,4})?)/i);
-      if (match) return match[0].replace(/^Documento\s*:\s*/i, "").trim();
-      const parts = text.split(/[|·]/).map(part => part.trim()).filter(Boolean);
-      return parts.find(part => /^(?:N[°ºo.]?\s*)?\d{2,8}(?:[-/]\d{2,4})?$/.test(part)) || "";
+      const sources = [
+        turn.deNumber,
+        turn.document,
+        turn.documentSource,
+        turn.notes,
+        turn.status
+      ].filter(Boolean).join(" | ");
+      const text = String(sources || "");
+      const directMatch = text.match(/(?:D\.?\s*E\.?|Decreto\s+Econ[oó]mico)\s*(?:N[°ºo.]*)?\s*[:\-]?\s*([0-9]{1,6}(?:\s*[-/]\s*[0-9]{2,4})?)/i);
+      if (directMatch) return `D.E. N° ${directMatch[1].replace(/\s+/g, "").replace("/", "-")}`;
+      const documentMatch = text.match(/Documento\s*:\s*(?:D\.?\s*E\.?\s*)?(?:N[°ºo.]*)?\s*([0-9]{1,6}(?:\s*[-/]\s*[0-9]{2,4})?)/i);
+      if (documentMatch) return `D.E. N° ${documentMatch[1].replace(/\s+/g, "").replace("/", "-")}`;
+      const looseMatch = text.match(/\b([0-9]{2,6}\s*[-/]\s*20[0-9]{2})\b/);
+      if (looseMatch) return `D.E. N° ${looseMatch[1].replace(/\s+/g, "").replace("/", "-")}`;
+      return "";
     }
 
     function monthlyTurnMatchesStatus(turn, filter) {
@@ -2826,8 +2911,7 @@
     }
 
     function monthlyTurnsForDisplay() {
-      if (!els.monthlyTurnPeriod.value) els.monthlyTurnPeriod.value = latestTurnPeriod();
-      const period = els.monthlyTurnPeriod.value;
+      const period = selectedMonthlyPeriod();
       const text = normalize(els.monthlyTurnSearch.value || "");
       const statusFilter = els.monthlyTurnStatus.value || "all";
 
@@ -2857,8 +2941,7 @@
 
     function renderMonthlyTurns() {
       if (!els.monthlyTurnResults) return;
-      if (!els.monthlyTurnPeriod.value) els.monthlyTurnPeriod.value = latestTurnPeriod();
-      const period = els.monthlyTurnPeriod.value;
+      const period = selectedMonthlyPeriod();
       const periodTurns = turns.filter(turn => String(turn.date || "").slice(0, 7) === period);
       const displayedTurns = monthlyTurnsForDisplay();
       const activeCount = periodTurns.filter(turn => turnStatusType(turn) === "active").length;
@@ -2917,7 +3000,7 @@
                   </td>
                   <td>
                     <div class="turn-state">
-                      <span class="badge ${statusBadgeClass(turn.status)}">${escapeHtml(turn.status || "Sin estado")}</span>
+                      <span class="badge ${type === "replacement" ? "gold" : statusBadgeClass(turn.status)}">${escapeHtml(type === "replacement" && !statusKey(turn.status).includes("reemplaz") ? "Reemplazante vigente" : (turn.status || "Sin estado"))}</span>
                       ${type === "excused" ? `<span class="muted">No cuenta como turno realizado</span>` : ""}
                       ${type === "replacement" ? `<span class="muted">Reemplazante</span>` : ""}
                     </div>
@@ -3136,6 +3219,8 @@
           month: month || monthFmt.format(parseDate(date)),
           status: pick("estado registro", "estado") || "Programado",
           active: pick("habilitado turno", "activo para procesamiento", "activo") || "Sí",
+          deNumber: pick("d.e.", "d.e", "decreto economico", "decreto económico", "decreto", "numero decreto", "número decreto", "documento"),
+          documentSource: pick("documento fuente"),
           disableReason: pick("motivo inhabilitacion", "motivo inhabilitación", "motivo no habilitado"),
           disableDocumentUrl: pick("documento respaldo inhabilitacion", "documento respaldo inhabilitación", "respaldo inhabilitacion", "respaldo inhabilitación"),
           notes: pick("observaciones", "documento fuente")
@@ -3930,7 +4015,8 @@
     });
     els.excuseReplacementButton.addEventListener("click", handleExcuseReplacement);
     els.refreshMonthlyTurns.addEventListener("click", renderMonthlyTurns);
-    els.monthlyTurnPeriod.addEventListener("change", renderMonthlyTurns);
+    els.monthlyTurnYear.addEventListener("change", renderMonthlyTurns);
+    els.monthlyTurnMonth.addEventListener("change", renderMonthlyTurns);
     els.monthlyTurnStatus.addEventListener("change", renderMonthlyTurns);
     ["input", "search", "keyup", "paste"].forEach(eventName => {
       els.monthlyTurnSearch.addEventListener(eventName, () => window.setTimeout(renderMonthlyTurns, 0));
