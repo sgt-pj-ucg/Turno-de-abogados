@@ -406,6 +406,67 @@
       align-items: start;
     }
 
+    .new-lawyers-layout {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr);
+      gap: 18px;
+      align-items: start;
+    }
+
+    .new-lawyer-entry-panel .save-note {
+      margin: 18px;
+      max-width: none;
+    }
+
+    .new-base-lawyer-form {
+      padding: 0 18px 18px;
+      display: grid;
+      gap: 14px;
+    }
+
+    .new-lawyer-main-fields,
+    .new-lawyer-detail-fields {
+      display: grid;
+      grid-template-columns: minmax(260px, .75fr) minmax(360px, 1.25fr);
+      gap: 14px;
+      align-items: start;
+    }
+
+    .new-lawyer-contact-fields {
+      display: grid;
+      grid-template-columns: minmax(240px, 1.2fr) minmax(220px, .85fr) minmax(170px, .55fr);
+      gap: 14px;
+      align-items: start;
+    }
+
+    .new-lawyer-actions {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(230px, 320px);
+      gap: 16px;
+      align-items: center;
+      border-top: 1px solid var(--line);
+      padding-top: 16px;
+    }
+
+    .new-lawyer-actions p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .new-lawyer-actions .btn {
+      min-height: 48px;
+      width: 100%;
+    }
+
+    .new-base-lawyer-form .last-save {
+      margin: 0;
+    }
+
+    .new-lawyer-list-panel .lawyer-results {
+      max-height: none;
+    }
+
     .panel {
       background: var(--panel);
       border: 1px solid var(--line);
@@ -1493,7 +1554,7 @@
         margin-bottom: 0;
       }
       .sync-card { display: none; }
-      .grid, .new-turn-grid { grid-template-columns: 1fr; }
+      .grid, .new-turn-grid, .new-lawyers-layout { grid-template-columns: 1fr; }
       .metrics { grid-template-columns: repeat(2, minmax(150px, 1fr)); }
     }
 
@@ -1503,7 +1564,7 @@
       .actions { justify-content: stretch; }
       .actions .btn { flex: 1; }
       .contact-toolbar { align-items: flex-start; flex-direction: column; }
-      .metrics, .contact-grid, .summary-grid, .form-grid, .turn-meta-grid, .rank-controls, .alert-grid, .alert-edit-grid, .document-row, .period-picker { grid-template-columns: 1fr; }
+      .metrics, .contact-grid, .summary-grid, .form-grid, .turn-meta-grid, .rank-controls, .alert-grid, .alert-edit-grid, .document-row, .period-picker, .new-lawyer-main-fields, .new-lawyer-contact-fields, .new-lawyer-detail-fields, .new-lawyer-actions, .alert-contact-grid { grid-template-columns: 1fr; }
       .rank-search { grid-column: span 1; }
       .alert-address-field,
       .alert-save-cell { grid-column: auto; }
@@ -1635,36 +1696,38 @@
       </section>
 
       <section class="view" id="newLawyersView">
-        <div class="grid">
-          <section class="panel">
+        <div class="new-lawyers-layout">
+          <section class="panel new-lawyer-entry-panel">
             <div class="panel-header">
               <h3>Ingreso de abogados nuevos</h3>
               <span class="badge gold">Sin turno histórico</span>
             </div>
             <p class="save-note"><strong>Uso recomendado:</strong> registra aquí abogados que deben estar disponibles para búsqueda y ranking, pero que todavía no tienen un turno asignado. No se agregan a la hoja histórica de turnos.</p>
             <form id="newBaseLawyerForm" class="new-base-lawyer-form" novalidate>
-              <div class="field">
-                <label for="newBaseLawyerRut">RUT abogado(a)</label>
-                <input id="newBaseLawyerRut" inputmode="text" placeholder="12.345.678-5" required>
-                <div class="rut-lookup-box" data-rut-lookup>
-                  <span class="rut-lookup-label">Verificación externa</span>
-                  <button class="rut-lookup-trigger" type="button" data-rut-lookup-trigger>Consultar RUT</button>
-                  <div class="rut-lookup-popover" data-rut-popover>
-                    <h5>Consultar en Poder Judicial</h5>
-                    <p>Copia el RUT y abre la búsqueda oficial. En la página externa solo debes pegarlo y presionar buscar.</p>
-                    <span class="rut-preview-pill" data-rut-preview>Sin RUT ingresado</span>
-                    <div class="rut-popup-actions">
-                      <button type="button" data-copy-rut>Copiar RUT</button>
-                      <a href="https://www.pjud.cl/transparencia/busqueda-de-abogados" target="_blank" rel="noopener">Abrir Poder Judicial</a>
+              <div class="new-lawyer-main-fields">
+                <div class="field">
+                  <label for="newBaseLawyerRut">RUT abogado(a)</label>
+                  <input id="newBaseLawyerRut" inputmode="text" placeholder="12.345.678-5" required>
+                  <div class="rut-lookup-box" data-rut-lookup>
+                    <span class="rut-lookup-label">Verificación externa</span>
+                    <button class="rut-lookup-trigger" type="button" data-rut-lookup-trigger>Consultar RUT</button>
+                    <div class="rut-lookup-popover" data-rut-popover>
+                      <h5>Consultar en Poder Judicial</h5>
+                      <p>Copia el RUT y abre la búsqueda oficial. En la página externa solo debes pegarlo y presionar buscar.</p>
+                      <span class="rut-preview-pill" data-rut-preview>Sin RUT ingresado</span>
+                      <div class="rut-popup-actions">
+                        <button type="button" data-copy-rut>Copiar RUT</button>
+                        <a href="https://www.pjud.cl/transparencia/busqueda-de-abogados" target="_blank" rel="noopener">Abrir Poder Judicial</a>
+                      </div>
                     </div>
                   </div>
                 </div>
+                <div class="field">
+                  <label for="newBaseLawyerName">Nombre completo</label>
+                  <input id="newBaseLawyerName" placeholder="Nombre según registro oficial" required>
+                </div>
               </div>
-              <div class="field">
-                <label for="newBaseLawyerName">Nombre completo</label>
-                <input id="newBaseLawyerName" placeholder="Nombre según registro oficial" required>
-              </div>
-              <div class="form-grid">
+              <div class="new-lawyer-contact-fields">
                 <div class="field">
                   <label for="newBaseLawyerEmail">Correo</label>
                   <input id="newBaseLawyerEmail" type="text" inputmode="email" placeholder="correo@dominio.cl">
@@ -1673,12 +1736,6 @@
                   <label for="newBaseLawyerPhone">Teléfono</label>
                   <input id="newBaseLawyerPhone" placeholder="+56 9 1234 5678">
                 </div>
-              </div>
-              <div class="field">
-                <label for="newBaseLawyerAddress">Domicilio</label>
-                <input id="newBaseLawyerAddress" placeholder="Domicilio profesional">
-              </div>
-              <div class="form-grid">
                 <div class="field">
                   <label for="newBaseLawyerActive">Habilitado para turno</label>
                   <select id="newBaseLawyerActive">
@@ -1686,16 +1743,26 @@
                     <option>No</option>
                   </select>
                 </div>
+              </div>
+              <div class="new-lawyer-detail-fields">
+                <div class="field">
+                  <label for="newBaseLawyerAddress">Domicilio</label>
+                  <input id="newBaseLawyerAddress" placeholder="Domicilio profesional">
+                </div>
                 <div class="field">
                   <label for="newBaseLawyerNotes">Observaciones</label>
                   <input id="newBaseLawyerNotes" maxlength="160" placeholder="Antecedente breve opcional">
                 </div>
               </div>
-              <button class="btn primary" id="saveNewBaseLawyerButton" type="submit">Guardar abogado(a) nuevo(a)</button>
+              <div class="new-lawyer-actions">
+                <p>Se guardará en la pestaña <strong>Abogados nuevos</strong> y quedará disponible para búsqueda y ranking sin crear un turno.</p>
+                <button class="btn primary" id="saveNewBaseLawyerButton" type="submit">Guardar abogado(a) nuevo(a)</button>
+              </div>
+              <div class="last-save" id="newBaseLawyerStatus"></div>
             </form>
           </section>
 
-          <section class="panel">
+          <section class="panel new-lawyer-list-panel">
             <div class="panel-header">
               <h3>Abogados nuevos disponibles</h3>
               <span class="badge blue" id="newBaseLawyerCount">0 registros</span>
@@ -2003,10 +2070,10 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbz04bHG89KZ9Va8kKRPyrZa6ra0sI-8vIzGmwrRnBQ6cW5YuArbBWdajPYGtaxB3fhI/exec";
-    const APP_VERSION = "1.5.1-abogados-nuevos";
-    const REQUIRED_SCRIPT_VERSION = "2026-06-22-abogados-nuevos-v14";
+    const APP_VERSION = "1.5.2-abogados-nuevos";
+    const REQUIRED_SCRIPT_VERSION = "2026-06-22-abogados-nuevos-v15";
     const ACCEPTED_SCRIPT_VERSIONS = [
-      "2026-06-22-abogados-nuevos-v14"
+      "2026-06-22-abogados-nuevos-v15"
     ];
     const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
@@ -2060,6 +2127,7 @@
       newBaseLawyerActive: document.querySelector("#newBaseLawyerActive"),
       newBaseLawyerNotes: document.querySelector("#newBaseLawyerNotes"),
       saveNewBaseLawyerButton: document.querySelector("#saveNewBaseLawyerButton"),
+      newBaseLawyerStatus: document.querySelector("#newBaseLawyerStatus"),
       newBaseLawyerList: document.querySelector("#newBaseLawyerList"),
       newBaseLawyerCount: document.querySelector("#newBaseLawyerCount"),
       rankingSearch: document.querySelector("#rankingSearch"),
@@ -4565,7 +4633,7 @@
 
     async function handleNewBaseLawyerSubmit(event) {
       event.preventDefault();
-      if (!requireAuthenticatedUser()) return;
+      if (!canWriteSafely()) return;
 
       const lawyer = {
         rut: formatRut(els.newBaseLawyerRut.value.trim()),
@@ -4578,10 +4646,14 @@
       };
 
       if (!lawyer.rut || !lawyer.name) {
+        els.newBaseLawyerStatus.classList.add("visible");
+        els.newBaseLawyerStatus.innerHTML = "<strong>Registro pendiente:</strong> ingresa RUT y nombre del abogado(a).";
         showToast("Ingresa RUT y nombre del abogado(a) nuevo(a).");
         return;
       }
       if (!isValidRut(lawyer.rut)) {
+        els.newBaseLawyerStatus.classList.add("visible");
+        els.newBaseLawyerStatus.innerHTML = "<strong>Registro pendiente:</strong> el RUT no es válido.";
         showToast("El RUT del abogado(a) no es válido.");
         els.newBaseLawyerRut.focus();
         return;
@@ -4610,6 +4682,8 @@
       els.saveNewBaseLawyerButton.textContent = "Guardar abogado(a) nuevo(a)";
 
       if (!response.ok) {
+        els.newBaseLawyerStatus.classList.add("visible");
+        els.newBaseLawyerStatus.innerHTML = `<strong>No se pudo guardar:</strong> ${escapeHtml(response.message || "Apps Script no confirmó el registro.")}`;
         showToast(response.message || "No se pudo guardar el abogado(a) nuevo(a).");
         return;
       }
@@ -4626,6 +4700,8 @@
       els.newBaseLawyerActive.value = "Sí";
       selectedLawyerKey = "";
       renderAll();
+      els.newBaseLawyerStatus.classList.add("visible");
+      els.newBaseLawyerStatus.innerHTML = `<strong>Último abogado(a) nuevo(a) ingresado:</strong> ${escapeHtml(lawyer.name)} · ${escapeHtml(lawyer.rut)} · sincronización enviada a Google Sheets.`;
       showToast("Abogado(a) nuevo(a) guardado y disponible para búsqueda/ranking.");
       syncFromSheet().catch(() => renderAll());
     }
