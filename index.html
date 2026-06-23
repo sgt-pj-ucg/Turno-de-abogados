@@ -4236,6 +4236,10 @@
 
         window[callbackName] = response => {
           cleanup();
+          if (!response?.ok && normalize(response?.message || "").includes("accion no reconocida")) {
+            scriptVersionOk = false;
+            publishedScriptVersion = response?.version || publishedScriptVersion;
+          }
           resolve({
             ok: Boolean(response && response.ok),
             message: response?.message || (response?.ok ? "Acción completada." : "No se pudo completar la acción.")
@@ -4832,6 +4836,13 @@
         if (exists && !confirm(`Ya existe un registro para ${exists.name}. ¿Deseas continuar de todas formas?`)) {
           els.newBaseLawyerStatus.classList.add("visible");
           els.newBaseLawyerStatus.innerHTML = "<strong>Guardado cancelado:</strong> ya existe un registro similar en la base.";
+          return;
+        }
+
+        const scriptReady = await checkAppsScriptVersion();
+        if (!scriptReady) {
+          els.newBaseLawyerStatus.classList.add("visible");
+          els.newBaseLawyerStatus.innerHTML = `<strong>No se enviará el cambio:</strong> Apps Script publicado está en ${escapeHtml(publishedScriptVersion || "versión antigua o no verificada")}. Publica ${escapeHtml(REQUIRED_SCRIPT_VERSION)}.`;
           return;
         }
 
