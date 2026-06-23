@@ -1756,7 +1756,7 @@
               </div>
               <div class="new-lawyer-actions">
                 <p>Se guardará en la pestaña <strong>Abogados nuevos</strong> y quedará disponible para búsqueda y ranking sin crear un turno.</p>
-                <button class="btn primary" id="saveNewBaseLawyerButton" type="submit">Guardar abogado(a) nuevo(a)</button>
+                <button class="btn primary" id="saveNewBaseLawyerButton" type="button">Guardar abogado(a) nuevo(a)</button>
               </div>
               <div class="last-save" id="newBaseLawyerStatus"></div>
             </form>
@@ -2070,7 +2070,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzzQ5ng3ncE0e-o2pYTwP9zfzeRqnUWW4Ps_S87OGTyg6izsi9aX01cLOCaLDi3dPv1/exec";
-    const APP_VERSION = "1.5.2-abogados-nuevos";
+    const APP_VERSION = "1.5.9-abogados-nuevos";
     const REQUIRED_SCRIPT_VERSION = "2026-06-22-abogados-nuevos-v15";
     const ACCEPTED_SCRIPT_VERSIONS = [
       "2026-06-22-abogados-nuevos-v15"
@@ -2281,8 +2281,12 @@
     }
 
     function showAuthenticatedApp(user) {
-      authenticatedUser = user;
-      sessionStorage.setItem(USER_SESSION_STORAGE_KEY, JSON.stringify(user));
+      authenticatedUser = {
+        ...user,
+        scriptUrl: GOOGLE_APPS_SCRIPT_URL,
+        requiredScriptVersion: REQUIRED_SCRIPT_VERSION
+      };
+      sessionStorage.setItem(USER_SESSION_STORAGE_KEY, JSON.stringify(authenticatedUser));
       els.currentUserName.textContent = user.name || "Usuario";
       els.currentUserRut.textContent = user.rut || "";
       els.loginScreen.hidden = true;
@@ -2310,6 +2314,10 @@
       try {
         const user = JSON.parse(rawSession);
         if (!user?.token || !user?.name) return false;
+        if (user.scriptUrl !== GOOGLE_APPS_SCRIPT_URL || user.requiredScriptVersion !== REQUIRED_SCRIPT_VERSION) {
+          sessionStorage.removeItem(USER_SESSION_STORAGE_KEY);
+          return false;
+        }
         showAuthenticatedApp(user);
         return true;
       } catch {
@@ -2383,7 +2391,9 @@
       showAuthenticatedApp({
         token: result.token,
         rut: result.rut,
-        name: result.name
+        name: result.name,
+        scriptUrl: GOOGLE_APPS_SCRIPT_URL,
+        requiredScriptVersion: REQUIRED_SCRIPT_VERSION
       });
       showToast(`Sesión iniciada: ${result.name}.`);
       initializeAppData();
@@ -2624,6 +2634,10 @@
         .replace(/\s+/g, "")
         .replace(/-/g, "")
         .replace(/[^0-9K]/g, "");
+    }
+
+    function normalizeRut(value) {
+      return cleanRut(value);
     }
 
     function isValidRut(value) {
@@ -3233,22 +3247,24 @@
         const subjectAffinity = subject && profile.subjects.includes(subject) ? 8 : 0;
         const courtAffinity = court && profile.courts.includes(court) ? 4 : 0;
         const repeatPenalty = Math.max(0, profile.turnsTotal - 1) * 2;
-        const score = profile.rankingMonths * 3 + subjectAffinity + courtAffinity - repeatPenalty;
+        const newLawyerPriority = profile.isNewBaseLawyer ? 10000 : 0;
+        const score = newLawyerPriority + profile.rankingMonths * 3 + subjectAffinity + courtAffinity - repeatPenalty;
         return { ...profile, specialties, score };
       }).filter(profile => {
-        const matchesSubject = !subject || profile.subjects.includes(subject);
-        const matchesCourt = !court || profile.courts.includes(court);
+        const matchesSubject = profile.isNewBaseLawyer || !subject || profile.subjects.includes(subject);
+        const matchesCourt = profile.isNewBaseLawyer || !court || profile.courts.includes(court);
         const matchesMonths = profile.rankingMonths >= rankingMinMonths;
         const matchesText = !rankingText || profile.nameSearchText.includes(rankingText);
         return matchesSubject && matchesCourt && matchesMonths && matchesText;
-      }).sort((a, b) => b.score - a.score || b.rankingMonths - a.rankingMonths || a.name.localeCompare(b.name, "es"));
+      }).sort((a, b) => Number(b.isNewBaseLawyer) - Number(a.isNewBaseLawyer) || b.score - a.score || b.rankingMonths - a.rankingMonths || a.name.localeCompare(b.name, "es"));
 
       const candidates = (ranked.length || rankingText) ? ranked : activeProfiles.map(profile => {
         const specialties = topSubjects(profile);
         const repeatPenalty = Math.max(0, profile.turnsTotal - 1) * 2;
-        return { ...profile, specialties, score: profile.rankingMonths * 3 - repeatPenalty };
+        const newLawyerPriority = profile.isNewBaseLawyer ? 10000 : 0;
+        return { ...profile, specialties, score: newLawyerPriority + profile.rankingMonths * 3 - repeatPenalty };
       }).filter(profile => profile.rankingMonths >= rankingMinMonths)
-        .sort((a, b) => b.score - a.score || b.rankingMonths - a.rankingMonths || a.name.localeCompare(b.name, "es"));
+        .sort((a, b) => Number(b.isNewBaseLawyer) - Number(a.isNewBaseLawyer) || b.score - a.score || b.rankingMonths - a.rankingMonths || a.name.localeCompare(b.name, "es"));
 
       els.rankingSummary.textContent = ranked.length
         ? `${candidates.length} candidato${candidates.length === 1 ? "" : "s"} habilitado${candidates.length === 1 ? "" : "s"} con ${rankingMinMonths}+ meses sin turno${rankingText ? ` que coinciden con "${els.rankingSearch.value.trim()}"` : ""}${subject ? ` para materia ${subject}` : ""}${court ? ` en ${court}` : ""}.`
@@ -3918,21 +3934,28 @@
 
     function mapNewLawyersRows(headersRaw, rows) {
       const headers = headersRaw.map(normalize);
-      const findHeader = keys => headers.findIndex(header => keys.some(key => header.includes(key)));
+      const findHeader = keys => {
+        const normalizedKeys = keys.map(normalize);
+        const exactIndex = headers.findIndex(header => normalizedKeys.includes(header));
+        if (exactIndex >= 0) return exactIndex;
+        return headers.findIndex(header => normalizedKeys.some(key => header.includes(key)));
+      };
       return rows.map((cols, rowIndex) => {
         const pick = (...keys) => {
-          const index = findHeader(keys.map(normalize));
+          const index = findHeader(keys);
           return index >= 0 ? String(cols[index] ?? "").trim() : "";
         };
         const createdAt = pick("fecha ingreso", "fecha", "creado") || new Date().toISOString();
+        const name = pick("abogado(a)", "abogado", "nombre completo", "nombre abogado", "nombre");
+        const rut = formatRut(pick("rut abogado(a)", "rut abogado", "rut", "run"));
         return {
           rowNumber: rowIndex + 2,
           source: "Abogados nuevos",
           entryMode: "Abogado(a) nuevo(a)",
           id: pick("id"),
           createdAt,
-          name: pick("abogado", "abogado(a)", "nombre"),
-          rut: formatRut(pick("rut abogado", "rut abogado(a)", "rut", "run")),
+          name,
+          rut,
           address: pick("domicilio", "direccion", "dirección"),
           phone: pick("fono", "telefono", "teléfono"),
           email: pick("email", "correo"),
@@ -4119,6 +4142,15 @@
       if (scriptVersionOk === true) return true;
       showToast(`No se enviará el cambio: Apps Script publicado está en ${publishedScriptVersion || "versión antigua o no verificada"}. Publica ${REQUIRED_SCRIPT_VERSION}.`);
       checkAppsScriptVersion();
+      return false;
+    }
+
+    async function canWriteSafelyAsync() {
+      if (!requireAuthenticatedUser()) return false;
+      if (scriptVersionOk === true) return true;
+      const isReady = await checkAppsScriptVersion();
+      if (isReady) return true;
+      showToast(`No se enviará el cambio: Apps Script publicado está en ${publishedScriptVersion || "versión antigua o no verificada"}. Publica ${REQUIRED_SCRIPT_VERSION}.`);
       return false;
     }
 
@@ -4633,77 +4665,101 @@
 
     async function handleNewBaseLawyerSubmit(event) {
       event.preventDefault();
-      if (!canWriteSafely()) return;
-
-      const lawyer = {
-        rut: formatRut(els.newBaseLawyerRut.value.trim()),
-        name: els.newBaseLawyerName.value.trim(),
-        email: els.newBaseLawyerEmail.value.trim(),
-        phone: els.newBaseLawyerPhone.value.trim(),
-        address: els.newBaseLawyerAddress.value.trim(),
-        active: els.newBaseLawyerActive.value || "Sí",
-        notes: els.newBaseLawyerNotes.value.trim()
-      };
-
-      if (!lawyer.rut || !lawyer.name) {
-        els.newBaseLawyerStatus.classList.add("visible");
-        els.newBaseLawyerStatus.innerHTML = "<strong>Registro pendiente:</strong> ingresa RUT y nombre del abogado(a).";
-        showToast("Ingresa RUT y nombre del abogado(a) nuevo(a).");
-        return;
-      }
-      if (!isValidRut(lawyer.rut)) {
-        els.newBaseLawyerStatus.classList.add("visible");
-        els.newBaseLawyerStatus.innerHTML = "<strong>Registro pendiente:</strong> el RUT no es válido.";
-        showToast("El RUT del abogado(a) no es válido.");
-        els.newBaseLawyerRut.focus();
-        return;
-      }
-
-      const contactValidation = validateContact(lawyer);
-      if (contactValidation.errors.length) {
-        showToast(contactValidation.errors[0]);
-        return;
-      }
-
-      const exists = groupLawyers().find(profile =>
-        normalizeRut(profile.rut) === normalizeRut(lawyer.rut) ||
-        normalize(profile.name) === normalize(lawyer.name)
-      );
-      if (exists && !confirm(`Ya existe un registro para ${exists.name}. ¿Deseas continuar de todas formas?`)) return;
-
-      els.saveNewBaseLawyerButton.disabled = true;
-      els.saveNewBaseLawyerButton.textContent = "Guardando...";
-      showToast("Guardando abogado(a) nuevo(a)...");
-      const response = await saveNewBaseLawyerToGoogleSheet(lawyer).catch(error => ({
-        ok: false,
-        message: error?.message || "No se pudo guardar el abogado(a) nuevo(a)."
-      }));
-      els.saveNewBaseLawyerButton.disabled = false;
-      els.saveNewBaseLawyerButton.textContent = "Guardar abogado(a) nuevo(a)";
-
-      if (!response.ok) {
-        els.newBaseLawyerStatus.classList.add("visible");
-        els.newBaseLawyerStatus.innerHTML = `<strong>No se pudo guardar:</strong> ${escapeHtml(response.message || "Apps Script no confirmó el registro.")}`;
-        showToast(response.message || "No se pudo guardar el abogado(a) nuevo(a).");
-        return;
-      }
-
-      newLawyers.push({
-        ...lawyer,
-        id: "",
-        createdAt: new Date().toISOString(),
-        source: "Abogados nuevos",
-        entryMode: "Abogado(a) nuevo(a)",
-        notes: lawyer.notes || "Abogado(a) nuevo(a), sin registro de turno realizado."
-      });
-      els.newBaseLawyerForm.reset();
-      els.newBaseLawyerActive.value = "Sí";
-      selectedLawyerKey = "";
-      renderAll();
       els.newBaseLawyerStatus.classList.add("visible");
-      els.newBaseLawyerStatus.innerHTML = `<strong>Último abogado(a) nuevo(a) ingresado:</strong> ${escapeHtml(lawyer.name)} · ${escapeHtml(lawyer.rut)} · sincronización enviada a Google Sheets.`;
-      showToast("Abogado(a) nuevo(a) guardado y disponible para búsqueda/ranking.");
-      syncFromSheet().catch(() => renderAll());
+      els.newBaseLawyerStatus.innerHTML = "<strong>Validando datos...</strong> Preparando el guardado.";
+      try {
+        if (!requireAuthenticatedUser()) {
+          els.newBaseLawyerStatus.classList.add("visible");
+          els.newBaseLawyerStatus.innerHTML = "<strong>No se envió:</strong> ingresa nuevamente con RUT y clave antes de guardar.";
+          return;
+        }
+
+        const lawyer = {
+          rut: formatRut(els.newBaseLawyerRut.value.trim()),
+          name: els.newBaseLawyerName.value.trim(),
+          email: els.newBaseLawyerEmail.value.trim(),
+          phone: els.newBaseLawyerPhone.value.trim(),
+          address: els.newBaseLawyerAddress.value.trim(),
+          active: els.newBaseLawyerActive.value || "Sí",
+          notes: els.newBaseLawyerNotes.value.trim()
+        };
+
+        if (!lawyer.rut || !lawyer.name) {
+          els.newBaseLawyerStatus.classList.add("visible");
+          els.newBaseLawyerStatus.innerHTML = "<strong>Registro pendiente:</strong> ingresa RUT y nombre del abogado(a).";
+          showToast("Ingresa RUT y nombre del abogado(a) nuevo(a).");
+          return;
+        }
+        if (!isValidRut(lawyer.rut)) {
+          els.newBaseLawyerStatus.classList.add("visible");
+          els.newBaseLawyerStatus.innerHTML = "<strong>Registro pendiente:</strong> el RUT no es válido.";
+          showToast("El RUT del abogado(a) no es válido.");
+          els.newBaseLawyerRut.focus();
+          return;
+        }
+
+        const contactValidation = validateContact(lawyer);
+        if (contactValidation.errors.length) {
+          els.newBaseLawyerStatus.classList.add("visible");
+          els.newBaseLawyerStatus.innerHTML = `<strong>Registro pendiente:</strong> ${escapeHtml(contactValidation.errors[0])}`;
+          showToast(contactValidation.errors[0]);
+          return;
+        }
+
+        const exists = groupLawyers().find(profile =>
+          normalizeRut(profile.rut) === normalizeRut(lawyer.rut) ||
+          normalize(profile.name) === normalize(lawyer.name)
+        );
+        if (exists && !confirm(`Ya existe un registro para ${exists.name}. ¿Deseas continuar de todas formas?`)) {
+          els.newBaseLawyerStatus.classList.add("visible");
+          els.newBaseLawyerStatus.innerHTML = "<strong>Guardado cancelado:</strong> ya existe un registro similar en la base.";
+          return;
+        }
+
+        els.saveNewBaseLawyerButton.disabled = true;
+        els.saveNewBaseLawyerButton.textContent = "Guardando...";
+        els.newBaseLawyerStatus.innerHTML = "<strong>Guardando...</strong> Enviando a Google Sheets.";
+        showToast("Guardando abogado(a) nuevo(a)...");
+        const response = await saveNewBaseLawyerToGoogleSheet(lawyer).catch(error => ({
+          ok: false,
+          message: error?.message || "No se pudo guardar el abogado(a) nuevo(a)."
+        }));
+        els.saveNewBaseLawyerButton.disabled = false;
+        els.saveNewBaseLawyerButton.textContent = "Guardar abogado(a) nuevo(a)";
+
+        if (!response.ok) {
+          els.newBaseLawyerStatus.classList.add("visible");
+          els.newBaseLawyerStatus.innerHTML = `<strong>No se pudo guardar:</strong> ${escapeHtml(response.message || "Apps Script no confirmó el registro.")}`;
+          showToast(response.message || "No se pudo guardar el abogado(a) nuevo(a).");
+          if (normalize(response.message || "").includes("sesion")) {
+            window.setTimeout(logoutUser, 1200);
+          }
+          return;
+        }
+
+        newLawyers.push({
+          ...lawyer,
+          id: "",
+          createdAt: new Date().toISOString(),
+          source: "Abogados nuevos",
+          entryMode: "Abogado(a) nuevo(a)",
+          notes: lawyer.notes || "Abogado(a) nuevo(a), sin registro de turno realizado."
+        });
+        els.newBaseLawyerForm.reset();
+        els.newBaseLawyerActive.value = "Sí";
+        selectedLawyerKey = "";
+        renderAll();
+        els.newBaseLawyerStatus.classList.add("visible");
+        els.newBaseLawyerStatus.innerHTML = `<strong>Último abogado(a) nuevo(a) ingresado:</strong> ${escapeHtml(lawyer.name)} · ${escapeHtml(lawyer.rut)} · sincronización enviada a Google Sheets.`;
+        showToast("Abogado(a) nuevo(a) guardado y disponible para búsqueda/ranking.");
+        syncFromSheet().catch(() => renderAll());
+      } catch (error) {
+        els.saveNewBaseLawyerButton.disabled = false;
+        els.saveNewBaseLawyerButton.textContent = "Guardar abogado(a) nuevo(a)";
+        els.newBaseLawyerStatus.classList.add("visible");
+        els.newBaseLawyerStatus.innerHTML = `<strong>Error interno:</strong> ${escapeHtml(error?.message || "No se pudo completar el guardado.")}`;
+        showToast("No se pudo completar el guardado.");
+      }
     }
 
     document.querySelector("#turnForm").addEventListener("submit", async event => {
@@ -4990,6 +5046,7 @@
     els.loginRut.addEventListener("blur", syncRutFormat);
     els.logoutButton.addEventListener("click", logoutUser);
     els.newBaseLawyerForm.addEventListener("submit", handleNewBaseLawyerSubmit);
+    els.saveNewBaseLawyerButton.addEventListener("click", handleNewBaseLawyerSubmit);
     els.newBaseLawyerRut.addEventListener("input", event => {
       event.target.value = formatRut(event.target.value);
     });
