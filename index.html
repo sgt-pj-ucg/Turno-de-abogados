@@ -2084,10 +2084,10 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyGXPXCr-KKE0QSnGVXIudW23TLdYGG76TPnF6HInZcowAnpz_exuUEkCBkt46X5Gq1/exec";
-    const APP_VERSION = "1.6.1-abogados-nuevos-columnas";
-    const REQUIRED_SCRIPT_VERSION = "2026-06-23-abogados-nuevos-v17";
+    const APP_VERSION = "1.6.2-abogados-nuevos-primer-turno";
+    const REQUIRED_SCRIPT_VERSION = "2026-06-23-abogados-nuevos-v18";
     const ACCEPTED_SCRIPT_VERSIONS = [
-      "2026-06-23-abogados-nuevos-v17"
+      "2026-06-23-abogados-nuevos-v18"
     ];
     const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
@@ -2678,7 +2678,7 @@
     }
 
     function isRetiredNewLawyer(lawyer) {
-      return ["retirado", "eliminado", "inactivo base"].includes(normalize(lawyer?.stateBase || ""));
+      return ["retirado", "eliminado", "inactivo base", "con turno historico", "con turno histórico"].includes(normalize(lawyer?.stateBase || ""));
     }
 
     function groupLawyers() {
@@ -4687,6 +4687,25 @@
       els.confirmModal.classList.remove("visible");
     }
 
+    function markNewBaseLawyerWithHistoricalTurn(turn) {
+      const targetRut = normalizeRut(turn.rut || "");
+      const targetName = normalize(turn.name || "");
+      if (!targetRut && !targetName) return false;
+
+      let updated = false;
+      newLawyers = newLawyers.map(lawyer => {
+        const sameRut = targetRut && normalizeRut(lawyer.rut || "") === targetRut;
+        const sameName = targetName && normalize(lawyer.name || "") === targetName;
+        if (!sameRut && !sameName) return lawyer;
+        updated = true;
+        return {
+          ...lawyer,
+          stateBase: "Con turno histórico"
+        };
+      });
+      return updated;
+    }
+
     async function savePendingTurn() {
       if (!pendingTurn) return;
       const saveButton = document.querySelector("#saveLawyerButton");
@@ -4709,6 +4728,9 @@
       els.lastSaveStatus.innerHTML = `<strong>Último turno ingresado:</strong> ${escapeHtml(turn.name)} · ${escapeHtml(turn.subject)} · ${escapeHtml(turn.court)} · ${escapeHtml(turn.month)} ${escapeHtml(turn.year)}. Estado de sincronización: ${savedToSheet ? "enviado a Google Sheets" : "solo local"} · ${timestamp}.`;
 
       if (savedToSheet) {
+        if (turn.entryMode === "Abogado(a) nuevo(a)") {
+          markNewBaseLawyerWithHistoricalTurn(turn);
+        }
         showToast("Turno enviado a Google Sheets. Actualizando datos...");
         await syncFromSheet().catch(() => renderAll());
         showToast("Turno guardado y datos actualizados.");
