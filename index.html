@@ -2424,7 +2424,7 @@
 
     function contactIssues(profile) {
       const issues = [];
-      if (!hasData(profile.rut)) issues.push("RUT");
+      if (profile.isNewBaseLawyer && !hasData(profile.rut)) issues.push("RUT");
       if (!hasData(profile.email)) issues.push("correo");
       if (!hasData(profile.phone)) issues.push("teléfono");
       if (!hasData(profile.address)) issues.push("domicilio");
@@ -4931,12 +4931,12 @@
         document.querySelector("#turnDate").focus();
         return;
       }
-      if (!lawyerRut) {
-        showToast("Completa el RUT del abogado(a) antes de guardar.");
+      if (turnFormMode === "new" && !lawyerRut) {
+        showToast("Completa el RUT del abogado(a) nuevo(a) antes de guardar.");
         document.querySelector("#lawyerRut").focus();
         return;
       }
-      if (!isValidRut(lawyerRut)) {
+      if (lawyerRut && !isValidRut(lawyerRut)) {
         showToast("El RUT del abogado(a) no es válido. Revisa número y dígito verificador.");
         document.querySelector("#lawyerRut").focus();
         return;
