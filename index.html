@@ -1624,6 +1624,7 @@
         <button type="button" data-view="alerts">Alertas de información</button>
         <button type="button" data-view="excuses">Excusas y reemplazos</button>
         <button type="button" data-view="turns">Turnos de Abogados</button>
+        <button type="button" data-view="decrees">Decretos Económicos</button>
       </nav>
       <div class="user-chip">
         <span>Usuario conectado</span>
@@ -1915,10 +1916,11 @@
                   <label for="statusInput">Estado</label>
                   <select id="statusInput">
                     <option>Programado</option>
+                    <option>Original vigente</option>
                     <option>Turno realizado</option>
+                    <option>Original reemplazado</option>
                     <option>Excusado</option>
                     <option>Realizado por reemplazo</option>
-                    <option>Reemplazado</option>
                     <option>Anulado</option>
                   </select>
                 </div>
@@ -2029,6 +2031,34 @@
           </div>
         </section>
       </section>
+
+      <section class="view" id="decreesView">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3>Biblioteca de Decretos Económicos</h3>
+              <p class="muted">Consulta documentos disponibles en la carpeta Drive institucional.</p>
+            </div>
+            <span class="badge blue" id="decreeCount">0 documentos</span>
+          </div>
+          <div class="rank-controls">
+            <div class="field rank-search">
+              <label for="decreeSearch">Buscar D.E. o documento</label>
+              <input id="decreeSearch" type="search" placeholder="Ej. 159-2026, reemplazo, materia o nombre del archivo">
+            </div>
+            <div class="field">
+              <label for="decreeYearFilter">Año</label>
+              <select id="decreeYearFilter">
+                <option value="">Todos</option>
+              </select>
+            </div>
+            <button class="btn" id="refreshDecrees" type="button">Actualizar biblioteca</button>
+          </div>
+          <div class="alert-detail" id="decreeList">
+            <div class="empty">La biblioteca se cargará desde Drive al sincronizar.</div>
+          </div>
+        </section>
+      </section>
     </main>
   </div>
 
@@ -2083,11 +2113,11 @@
 
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
-    const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbyGXPXCr-KKE0QSnGVXIudW23TLdYGG76TPnF6HInZcowAnpz_exuUEkCBkt46X5Gq1/exec";
-    const APP_VERSION = "1.6.2-abogados-nuevos-primer-turno";
-    const REQUIRED_SCRIPT_VERSION = "2026-06-23-abogados-nuevos-v18";
+    const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzrngSToQ8bnIHqPgaiRSG2cg2KDzeOF9JrNtPYanBfuDhCwv6YWtbIYgcWrrilrIXy/exec";
+    const APP_VERSION = "1.6.4-biblioteca-decretos";
+    const REQUIRED_SCRIPT_VERSION = "2026-06-23-biblioteca-decretos-v20";
     const ACCEPTED_SCRIPT_VERSIONS = [
-      "2026-06-23-abogados-nuevos-v18"
+      "2026-06-23-biblioteca-decretos-v20"
     ];
     const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
@@ -2101,6 +2131,8 @@
 
     let turns = [...seedTurns];
     let newLawyers = [];
+    let decrees = [];
+    let decreeLoadError = "";
     let editingNewBaseLawyerRowNumber = null;
     let selectedLawyerKey = "";
     let rankingMinMonths = 0;
@@ -2173,6 +2205,11 @@
       monthlyTurnBadge: document.querySelector("#monthlyTurnBadge"),
       monthlyTurnSummary: document.querySelector("#monthlyTurnSummary"),
       monthlyTurnResults: document.querySelector("#monthlyTurnResults"),
+      decreeSearch: document.querySelector("#decreeSearch"),
+      decreeYearFilter: document.querySelector("#decreeYearFilter"),
+      refreshDecrees: document.querySelector("#refreshDecrees"),
+      decreeCount: document.querySelector("#decreeCount"),
+      decreeList: document.querySelector("#decreeList"),
       confirmModal: document.querySelector("#confirmModal"),
       confirmBody: document.querySelector("#confirmBody"),
       cancelConfirm: document.querySelector("#cancelConfirm"),
@@ -3644,6 +3681,137 @@
       `;
     }
 
+    function decreeSearchText(decree) {
+      return normalize([
+        decree.deNumber,
+        decree.year,
+        decree.name,
+        decree.mimeType,
+        decree.updatedAt
+      ].join(" "));
+    }
+
+    function decreeYears() {
+      return [...new Set(decrees.map(decree => decree.year).filter(Boolean))]
+        .sort((a, b) => String(b).localeCompare(String(a)));
+    }
+
+    function populateDecreeFilters() {
+      if (!els.decreeYearFilter) return;
+      const selected = els.decreeYearFilter.value;
+      const years = decreeYears();
+      els.decreeYearFilter.innerHTML = `<option value="">Todos</option>` + years
+        .map(year => `<option value="${escapeHtml(year)}">${escapeHtml(year)}</option>`)
+        .join("");
+      if (years.includes(selected)) els.decreeYearFilter.value = selected;
+    }
+
+    function filteredDecrees() {
+      const text = normalize(els.decreeSearch?.value || "");
+      const year = els.decreeYearFilter?.value || "";
+      return decrees.filter(decree => {
+        if (year && String(decree.year || "") !== year) return false;
+        if (!text) return true;
+        return decreeSearchText(decree).includes(text);
+      });
+    }
+
+    function renderDecrees() {
+      if (!els.decreeList || !els.decreeCount) return;
+      populateDecreeFilters();
+      const visible = filteredDecrees();
+      els.decreeCount.textContent = `${visible.length} documento${visible.length === 1 ? "" : "s"}`;
+
+      if (decreeLoadError) {
+        els.decreeList.innerHTML = `<div class="empty">No se pudo cargar la biblioteca: ${escapeHtml(decreeLoadError)}</div>`;
+        return;
+      }
+
+      if (!decrees.length) {
+        els.decreeList.innerHTML = `<div class="empty">Aún no hay decretos cargados desde Drive. Presiona “Actualizar biblioteca”.</div>`;
+        return;
+      }
+
+      if (!visible.length) {
+        els.decreeList.innerHTML = `<div class="empty">No hay decretos que coincidan con los filtros seleccionados.</div>`;
+        return;
+      }
+
+      els.decreeList.innerHTML = visible.map(decree => `
+        <article class="alert-lawyer-card">
+          <div class="alert-card-head">
+            <div>
+              <strong>${escapeHtml(decree.deNumber ? `D.E. ${decree.deNumber}` : decree.name)}</strong>
+              <p class="muted" style="margin:4px 0 0;">${escapeHtml(decree.name)}</p>
+            </div>
+            <span class="badge ${decree.year ? "blue" : "gold"}">${escapeHtml(decree.year || "Sin año")}</span>
+          </div>
+          <div class="alert-edit-grid">
+            <div class="info-box"><span>D.E.</span><strong>${displayValue(decree.deNumber)}</strong></div>
+            <div class="info-box"><span>Actualizado</span><strong>${displayValue(decree.updatedAt)}</strong></div>
+            <div class="info-box alert-address-field"><span>Tipo de archivo</span><strong>${displayValue(decree.mimeType)}</strong></div>
+            <div class="alert-save-cell">
+              <a class="btn primary" href="${escapeHtml(decree.url)}" target="_blank" rel="noopener">Ver documento</a>
+            </div>
+          </div>
+        </article>
+      `).join("");
+    }
+
+    function loadDecreesViaAppsScript() {
+      if (!GOOGLE_APPS_SCRIPT_URL) return Promise.resolve([]);
+      return new Promise((resolve, reject) => {
+        const callbackName = `decrees_${Date.now()}_${Math.round(Math.random() * 100000)}`;
+        const script = document.createElement("script");
+        const timer = window.setTimeout(() => {
+          cleanup();
+          reject(new Error("Apps Script no respondió al cargar decretos."));
+        }, 12000);
+
+        function cleanup() {
+          window.clearTimeout(timer);
+          script.remove();
+          delete window[callbackName];
+        }
+
+        window[callbackName] = payload => {
+          cleanup();
+          if (payload?.ok && Array.isArray(payload.decrees)) {
+            resolve(payload.decrees);
+          } else {
+            reject(new Error(payload?.message || "Apps Script no devolvió decretos válidos."));
+          }
+        };
+
+        script.onerror = () => {
+          cleanup();
+          reject(new Error("No se pudo conectar con Apps Script para cargar decretos."));
+        };
+
+        const params = new URLSearchParams({
+          action: "decrees",
+          callback: callbackName,
+          cacheBust: Date.now()
+        });
+        script.src = `${GOOGLE_APPS_SCRIPT_URL}?${params.toString()}`;
+        document.head.appendChild(script);
+      });
+    }
+
+    async function syncDecrees(options = {}) {
+      try {
+        if (!options.silent) showToast("Actualizando biblioteca de decretos...");
+        decrees = await loadDecreesViaAppsScript();
+        decreeLoadError = "";
+        renderDecrees();
+        if (!options.silent) showToast(`Biblioteca actualizada: ${decrees.length} decreto${decrees.length === 1 ? "" : "s"}.`);
+      } catch (error) {
+        decreeLoadError = error?.message || "Error desconocido.";
+        renderDecrees();
+        if (!options.silent) showToast(decreeLoadError);
+      }
+    }
+
     async function handleExcuseReplacement() {
       if (!canWriteSafely()) return;
       const turn = selectedExcuseTurn();
@@ -3674,7 +3842,7 @@
         date: turn.date,
         court: turn.court,
         subject: turn.subject,
-        status: "Excusado",
+        status: "Original reemplazado",
         notes,
         reason,
         deNumber
@@ -3682,7 +3850,7 @@
       const saved = await updateTurnStatusInGoogleSheet(payload).catch(() => false);
 
       turns = turns.map(item => turnRecordKey(item) === turnRecordKey(turn)
-        ? { ...item, status: "Excusado", notes }
+        ? { ...item, status: "Original reemplazado", notes, deNumber }
         : item);
 
       document.querySelector("#turnDate").value = String(turn.date).slice(0, 7);
@@ -3729,6 +3897,7 @@
       renderProposal();
       renderExcuseTurnOptions();
       renderMonthlyTurns();
+      renderDecrees();
     }
 
     function renderNewBaseLawyers() {
@@ -3774,6 +3943,7 @@
       const isAlerts = view === "alerts";
       const isExcuses = view === "excuses";
       const isTurns = view === "turns";
+      const isDecrees = view === "decrees";
       document.querySelector("#pageTitle").textContent = isNewTurn
         ? "Generar y registrar nuevo turno"
         : isNewLawyers
@@ -3784,6 +3954,8 @@
             ? "Excusas y reemplazos"
             : isTurns
               ? "Turnos de Abogados"
+              : isDecrees
+                ? "Decretos Económicos"
               : "Consulta institucional de abogados";
       document.querySelector("#pageSubtitle").textContent = isNewTurn
         ? "Revisa el ranking por meses sin turno, especialidades históricas y registra una nueva asignación."
@@ -3795,6 +3967,8 @@
             ? "Marca un turno como excusado y prepara de inmediato el ingreso del abogado reemplazante."
             : isTurns
               ? "Busca por año y mes, revisa titulares, excusas, reemplazos, D.E. y datos de contacto del turno mensual."
+              : isDecrees
+                ? "Consulta la biblioteca de documentos respaldatorios alojada en Drive."
               : "Busca libremente por nombre, revisa datos de contacto y consulta todos los turnos realizados por año, mes, tribunal y materia.";
       updateFloatingButtons();
     }
@@ -4118,6 +4292,7 @@
       renderAll();
       renderLawyerDetail(keepSelectedKey ? groupLawyers().find(profile => profile.key === keepSelectedKey) : null);
       showToast(`Datos sincronizados: ${turns.length} turnos, ${groupLawyers().length} abogados, ${newLawyers.length} nuevos.`);
+      syncDecrees({ silent: true });
     }
 
     function checkAppsScriptVersion() {
@@ -5011,7 +5186,8 @@
         month: monthFmt.format(parseDate(`${monthValue}-01`)).split(" de ")[0],
         status: document.querySelector("#statusInput").value,
         active: document.querySelector("#enabledInput").value || "Sí",
-        notes: finalNotes
+        notes: finalNotes,
+        deNumber: extractDeNumber({ notes: finalNotes })
       };
       pendingTurn = newTurn;
       saveButton.disabled = false;
@@ -5141,6 +5317,11 @@
     els.monthlyTurnStatus.addEventListener("change", renderMonthlyTurns);
     ["input", "search", "keyup", "paste"].forEach(eventName => {
       els.monthlyTurnSearch.addEventListener(eventName, () => window.setTimeout(renderMonthlyTurns, 0));
+    });
+    els.refreshDecrees.addEventListener("click", () => syncDecrees());
+    els.decreeYearFilter.addEventListener("change", renderDecrees);
+    ["input", "search", "keyup", "paste"].forEach(eventName => {
+      els.decreeSearch.addEventListener(eventName, () => window.setTimeout(renderDecrees, 0));
     });
     document.querySelector("#suggestButton").addEventListener("click", renderCandidates);
     document.querySelector("#newLawyerButton").addEventListener("click", startNewLawyerEntry);
