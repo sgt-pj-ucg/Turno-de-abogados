@@ -2114,7 +2114,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwXmjYkU0-NfuoCa1eRDMbWt5ilZdRSJ_zNc3AivsfAY1l0AVFIyMhPhmZ_I96pmo-u/exec";
-    const APP_VERSION = "1.6.8-biblioteca-decretos-ok";
+    const APP_VERSION = "1.7.0-biblioteca-mes-ordenado";
     const REQUIRED_SCRIPT_VERSION = "2026-06-23-biblioteca-decretos-v23";
     const ACCEPTED_SCRIPT_VERSIONS = [
       "2026-06-23-biblioteca-decretos-v23"
@@ -3718,6 +3718,7 @@
         decree.deNumber,
         decree.year,
         decree.name,
+        decree.folder,
         decree.mimeType,
         decree.updatedAt
       ].join(" "));
@@ -3726,6 +3727,24 @@
     function decreeYears() {
       return [...new Set(decrees.map(decree => decree.year).filter(Boolean))]
         .sort((a, b) => String(b).localeCompare(String(a)));
+    }
+
+    function decreeMonthNumber(decree) {
+      const name = String(decree?.name || "");
+      const match = name.match(/^\s*20[0-9]{2}\D+([0-9]{1,2})\b/);
+      if (!match) return 99;
+      const month = Number(match[1]);
+      return month >= 1 && month <= 12 ? month : 99;
+    }
+
+    function sortDecreesForDisplay(list) {
+      return [...list].sort((a, b) => {
+        const yearCompare = String(b.year || "").localeCompare(String(a.year || ""));
+        if (yearCompare) return yearCompare;
+        const monthCompare = decreeMonthNumber(a) - decreeMonthNumber(b);
+        if (monthCompare) return monthCompare;
+        return String(a.name || "").localeCompare(String(b.name || ""), "es", { numeric: true });
+      });
     }
 
     function populateDecreeFilters() {
@@ -3741,11 +3760,11 @@
     function filteredDecrees() {
       const text = normalize(els.decreeSearch?.value || "");
       const year = els.decreeYearFilter?.value || "";
-      return decrees.filter(decree => {
+      return sortDecreesForDisplay(decrees.filter(decree => {
         if (year && String(decree.year || "") !== year) return false;
         if (!text) return true;
         return decreeSearchText(decree).includes(text);
-      });
+      }));
     }
 
     function renderDecrees() {
@@ -3773,17 +3792,12 @@
         <article class="alert-lawyer-card">
           <div class="alert-card-head">
             <div>
-              <strong>${escapeHtml(decree.deNumber ? `D.E. ${decree.deNumber}` : decree.name)}</strong>
-              <p class="muted" style="margin:4px 0 0;">${escapeHtml(decree.name)}</p>
+              <strong>${escapeHtml(decree.name || "Documento sin nombre")}</strong>
+              <p class="muted" style="margin:4px 0 0;">${escapeHtml(decree.folder || "Carpeta no informada")}</p>
             </div>
-            <span class="badge ${decree.year ? "blue" : "gold"}">${escapeHtml(decree.year || "Sin año")}</span>
-          </div>
-          <div class="alert-edit-grid">
-            <div class="info-box"><span>D.E.</span><strong>${displayValue(decree.deNumber)}</strong></div>
-            <div class="info-box"><span>Actualizado</span><strong>${displayValue(decree.updatedAt)}</strong></div>
-            <div class="info-box alert-address-field"><span>Tipo de archivo</span><strong>${displayValue(decree.mimeType)}</strong></div>
-            <div class="alert-save-cell">
-              <a class="btn primary" href="${escapeHtml(decree.url)}" target="_blank" rel="noopener">Ver documento</a>
+            <div style="display:flex;align-items:center;gap:10px;flex-wrap:wrap;justify-content:flex-end;">
+              <span class="badge ${decree.year ? "blue" : "gold"}">${escapeHtml(decree.year || "Sin año")}</span>
+              <a class="btn primary compact" href="${escapeHtml(decree.url)}" target="_blank" rel="noopener">Ver documento</a>
             </div>
           </div>
         </article>
