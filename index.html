@@ -208,6 +208,12 @@
       font-weight: 700;
     }
 
+    .btn.danger {
+      background: #fff;
+      color: var(--red);
+      border-color: #f3c7bf;
+    }
+
     .btn.success {
       background: var(--green);
       color: #fff;
@@ -457,6 +463,11 @@
     .new-lawyer-actions .btn {
       min-height: 48px;
       width: 100%;
+    }
+
+    .new-lawyer-button-stack {
+      display: grid;
+      gap: 8px;
     }
 
     .new-base-lawyer-form .last-save {
@@ -1756,7 +1767,10 @@
               </div>
               <div class="new-lawyer-actions">
                 <p>Se guardará en la pestaña <strong>Abogados nuevos</strong> y quedará disponible para búsqueda y ranking sin crear un turno.</p>
-                <button class="btn primary" id="saveNewBaseLawyerButton" type="button">Guardar abogado(a) nuevo(a)</button>
+                <div class="new-lawyer-button-stack">
+                  <button class="btn primary" id="saveNewBaseLawyerButton" type="button">Guardar abogado(a) nuevo(a)</button>
+                  <button class="btn" id="cancelNewBaseLawyerEdit" type="button" hidden>Cancelar edición</button>
+                </div>
               </div>
               <div class="last-save" id="newBaseLawyerStatus"></div>
             </form>
@@ -2070,10 +2084,10 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzzQ5ng3ncE0e-o2pYTwP9zfzeRqnUWW4Ps_S87OGTyg6izsi9aX01cLOCaLDi3dPv1/exec";
-    const APP_VERSION = "1.5.9-abogados-nuevos";
-    const REQUIRED_SCRIPT_VERSION = "2026-06-22-abogados-nuevos-v15";
+    const APP_VERSION = "1.6.0-abogados-nuevos-edit";
+    const REQUIRED_SCRIPT_VERSION = "2026-06-22-abogados-nuevos-v16";
     const ACCEPTED_SCRIPT_VERSIONS = [
-      "2026-06-22-abogados-nuevos-v15"
+      "2026-06-22-abogados-nuevos-v16"
     ];
     const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
@@ -2087,6 +2101,7 @@
 
     let turns = [...seedTurns];
     let newLawyers = [];
+    let editingNewBaseLawyerRowNumber = null;
     let selectedLawyerKey = "";
     let rankingMinMonths = 0;
     let pendingTurn = null;
@@ -2127,6 +2142,7 @@
       newBaseLawyerActive: document.querySelector("#newBaseLawyerActive"),
       newBaseLawyerNotes: document.querySelector("#newBaseLawyerNotes"),
       saveNewBaseLawyerButton: document.querySelector("#saveNewBaseLawyerButton"),
+      cancelNewBaseLawyerEdit: document.querySelector("#cancelNewBaseLawyerEdit"),
       newBaseLawyerStatus: document.querySelector("#newBaseLawyerStatus"),
       newBaseLawyerList: document.querySelector("#newBaseLawyerList"),
       newBaseLawyerCount: document.querySelector("#newBaseLawyerCount"),
@@ -2661,6 +2677,10 @@
         .sort((a, b) => a.localeCompare(b, "es"));
     }
 
+    function isRetiredNewLawyer(lawyer) {
+      return ["retirado", "eliminado", "inactivo base"].includes(normalize(lawyer?.stateBase || ""));
+    }
+
     function groupLawyers() {
       const profiles = new Map();
       const ensureProfile = record => {
@@ -2689,7 +2709,7 @@
         profile.email ||= turn.email;
       });
 
-      newLawyers.forEach(lawyer => {
+      newLawyers.filter(lawyer => !isRetiredNewLawyer(lawyer)).forEach(lawyer => {
         const profile = ensureProfile(lawyer);
         profile.newLawyerRecords.push(lawyer);
         profile.name = profile.name || lawyer.name;
@@ -2716,6 +2736,7 @@
         profile.excuseRecords = profile.turns.filter(turn => isExcuseOrReplacementStatus(turn.status));
         profile.turnsTotal = profile.performedTurns.length;
         profile.recordsTotal = profile.turns.length;
+        profile.latestNewLawyerRecord = latestNewLawyer;
         profile.isNewBaseLawyer = Boolean(latestNewLawyer && !profile.lastTurn);
         profile.active = profile.lastRecordedTurn ? isActiveValue(profile.lastRecordedTurn.active) : isActiveValue(latestNewLawyer?.active || "Sí");
         profile.baseNotes = latestNewLawyer?.notes || "";
@@ -3736,6 +3757,10 @@
             <div class="${hasData(profile.address) ? "" : "pending-cell"}"><span>Domicilio</span><strong>${displayValue(profile.address)}</strong></div>
           </div>
           ${profile.baseNotes ? `<p class="save-note">${escapeHtml(profile.baseNotes)}</p>` : ""}
+          <div class="candidate-actions">
+            <button class="btn compact edit-new-base-lawyer" type="button" data-key="${escapeHtml(profile.key)}">Editar datos</button>
+            <button class="btn compact danger retire-new-base-lawyer" type="button" data-key="${escapeHtml(profile.key)}">Retirar de base</button>
+          </div>
         </article>
       `).join("");
     }
@@ -3960,9 +3985,10 @@
           phone: pick("fono", "telefono", "teléfono"),
           email: pick("email", "correo"),
           active: pick("habilitado turno", "activo") || "Sí",
+          stateBase: pick("estado base", "estado base abogado", "estado") || "Sin turno realizado",
           notes: pick("observaciones", "nota", "motivo") || "Abogado(a) nuevo(a), sin registro de turno realizado."
         };
-      }).filter(lawyer => lawyer.name);
+      }).filter(lawyer => lawyer.name && !isRetiredNewLawyer(lawyer));
     }
 
     function sheetUrlForGviz() {
@@ -4191,15 +4217,15 @@
       });
     }
 
-    function saveNewBaseLawyerToGoogleSheet(lawyer) {
+    function sendNewBaseLawyerActionToGoogleSheet(action, payloadData, timeoutMessage) {
       if (!GOOGLE_APPS_SCRIPT_URL) return Promise.resolve({ ok: false, message: "No hay Apps Script configurado." });
-      const payload = { ...lawyer, actorToken: currentSessionToken() };
+      const payload = { ...payloadData, actorToken: currentSessionToken() };
       return new Promise(resolve => {
-        const callbackName = `newLawyerSave_${Date.now()}_${Math.round(Math.random() * 100000)}`;
+        const callbackName = `newLawyerAction_${Date.now()}_${Math.round(Math.random() * 100000)}`;
         const script = document.createElement("script");
         const timer = window.setTimeout(() => {
           cleanup();
-          resolve({ ok: false, message: "Apps Script no respondió al guardar abogado(a) nuevo(a)." });
+          resolve({ ok: false, message: timeoutMessage || "Apps Script no respondió." });
         }, 12000);
 
         function cleanup() {
@@ -4212,7 +4238,7 @@
           cleanup();
           resolve({
             ok: Boolean(response && response.ok),
-            message: response?.message || (response?.ok ? "Abogado(a) nuevo(a) guardado." : "No se pudo guardar.")
+            message: response?.message || (response?.ok ? "Acción completada." : "No se pudo completar la acción.")
           });
         };
 
@@ -4222,13 +4248,37 @@
         };
 
         const params = new URLSearchParams({
-          action: "appendnewlawyer",
+          action,
           callback: callbackName,
           payload: JSON.stringify(payload)
         });
         script.src = `${GOOGLE_APPS_SCRIPT_URL}?${params.toString()}`;
         document.head.appendChild(script);
       });
+    }
+
+    function saveNewBaseLawyerToGoogleSheet(lawyer) {
+      return sendNewBaseLawyerActionToGoogleSheet(
+        "appendnewlawyer",
+        lawyer,
+        "Apps Script no respondió al guardar abogado(a) nuevo(a)."
+      );
+    }
+
+    function updateNewBaseLawyerInGoogleSheet(lawyer) {
+      return sendNewBaseLawyerActionToGoogleSheet(
+        "updatenewlawyer",
+        lawyer,
+        "Apps Script no respondió al actualizar abogado(a) nuevo(a)."
+      );
+    }
+
+    function retireNewBaseLawyerInGoogleSheet(payload) {
+      return sendNewBaseLawyerActionToGoogleSheet(
+        "retirenewlawyer",
+        payload,
+        "Apps Script no respondió al retirar abogado(a) nuevo(a)."
+      );
     }
 
     function updateTurnStatusInGoogleSheet(payload) {
@@ -4663,6 +4713,73 @@
       }
     }
 
+    function resetNewBaseLawyerForm() {
+      editingNewBaseLawyerRowNumber = null;
+      els.newBaseLawyerForm.reset();
+      els.newBaseLawyerActive.value = "Sí";
+      els.saveNewBaseLawyerButton.disabled = false;
+      els.saveNewBaseLawyerButton.textContent = "Guardar abogado(a) nuevo(a)";
+      els.cancelNewBaseLawyerEdit.hidden = true;
+    }
+
+    function startEditNewBaseLawyer(key) {
+      const profile = groupLawyers().find(item => item.key === key);
+      const record = profile?.latestNewLawyerRecord;
+      if (!profile || !record) {
+        showToast("No se encontró el registro de Abogados nuevos.");
+        return;
+      }
+      editingNewBaseLawyerRowNumber = record.rowNumber;
+      els.newBaseLawyerRut.value = formatRut(record.rut || profile.rut || "");
+      els.newBaseLawyerName.value = record.name || profile.name || "";
+      els.newBaseLawyerEmail.value = record.email || profile.email || "";
+      els.newBaseLawyerPhone.value = record.phone || profile.phone || "";
+      els.newBaseLawyerAddress.value = record.address || profile.address || "";
+      els.newBaseLawyerActive.value = isActiveValue(record.active || profile.active) ? "Sí" : "No";
+      els.newBaseLawyerNotes.value = record.notes || profile.baseNotes || "";
+      els.saveNewBaseLawyerButton.textContent = "Actualizar abogado(a) nuevo(a)";
+      els.cancelNewBaseLawyerEdit.hidden = false;
+      els.newBaseLawyerStatus.classList.add("visible");
+      els.newBaseLawyerStatus.innerHTML = `<strong>Editando:</strong> ${escapeHtml(profile.name)}. Al guardar se actualizará la fila existente de Abogados nuevos.`;
+      els.newBaseLawyerForm.scrollIntoView({ behavior: "smooth", block: "start" });
+      els.newBaseLawyerName.focus();
+    }
+
+    async function retireNewBaseLawyer(key) {
+      if (!await canWriteSafelyAsync()) return;
+      const profile = groupLawyers().find(item => item.key === key);
+      const record = profile?.latestNewLawyerRecord;
+      if (!profile || !record) {
+        showToast("No se encontró el registro de Abogados nuevos.");
+        return;
+      }
+      const confirmed = confirm(`¿Retirar de la base a ${profile.name}?\n\nNo se borrará la fila: quedará marcada como Retirado y dejará de aparecer en búsqueda/ranking.`);
+      if (!confirmed) return;
+      showToast("Retirando abogado(a) nuevo(a)...");
+      const response = await retireNewBaseLawyerInGoogleSheet({
+        rowNumber: record.rowNumber,
+        rut: record.rut || profile.rut,
+        name: record.name || profile.name,
+        reason: "Retirado desde la aplicación"
+      });
+      if (!response.ok) {
+        showToast(response.message || "No se pudo retirar el registro.");
+        return;
+      }
+      newLawyers = newLawyers.map(lawyer =>
+        Number(lawyer.rowNumber) === Number(record.rowNumber)
+          ? { ...lawyer, stateBase: "Retirado", active: "No" }
+          : lawyer
+      );
+      if (Number(editingNewBaseLawyerRowNumber) === Number(record.rowNumber)) resetNewBaseLawyerForm();
+      selectedLawyerKey = "";
+      renderAll();
+      els.newBaseLawyerStatus.classList.add("visible");
+      els.newBaseLawyerStatus.innerHTML = `<strong>Registro retirado:</strong> ${escapeHtml(profile.name)} ya no aparecerá en búsqueda ni ranking.`;
+      showToast("Abogado(a) retirado de búsqueda/ranking.");
+      syncFromSheet().catch(() => renderAll());
+    }
+
     async function handleNewBaseLawyerSubmit(event) {
       event.preventDefault();
       els.newBaseLawyerStatus.classList.add("visible");
@@ -4675,6 +4792,7 @@
         }
 
         const lawyer = {
+          rowNumber: editingNewBaseLawyerRowNumber,
           rut: formatRut(els.newBaseLawyerRut.value.trim()),
           name: els.newBaseLawyerName.value.trim(),
           email: els.newBaseLawyerEmail.value.trim(),
@@ -4707,8 +4825,9 @@
         }
 
         const exists = groupLawyers().find(profile =>
-          normalizeRut(profile.rut) === normalizeRut(lawyer.rut) ||
-          normalize(profile.name) === normalize(lawyer.name)
+          (normalizeRut(profile.rut) === normalizeRut(lawyer.rut) ||
+          normalize(profile.name) === normalize(lawyer.name)) &&
+          Number(profile.latestNewLawyerRecord?.rowNumber || 0) !== Number(editingNewBaseLawyerRowNumber || 0)
         );
         if (exists && !confirm(`Ya existe un registro para ${exists.name}. ¿Deseas continuar de todas formas?`)) {
           els.newBaseLawyerStatus.classList.add("visible");
@@ -4716,16 +4835,19 @@
           return;
         }
 
+        const isEditing = Boolean(editingNewBaseLawyerRowNumber);
         els.saveNewBaseLawyerButton.disabled = true;
-        els.saveNewBaseLawyerButton.textContent = "Guardando...";
-        els.newBaseLawyerStatus.innerHTML = "<strong>Guardando...</strong> Enviando a Google Sheets.";
-        showToast("Guardando abogado(a) nuevo(a)...");
-        const response = await saveNewBaseLawyerToGoogleSheet(lawyer).catch(error => ({
+        els.saveNewBaseLawyerButton.textContent = isEditing ? "Actualizando..." : "Guardando...";
+        els.newBaseLawyerStatus.innerHTML = isEditing
+          ? "<strong>Actualizando...</strong> Enviando cambios a Google Sheets."
+          : "<strong>Guardando...</strong> Enviando a Google Sheets.";
+        showToast(isEditing ? "Actualizando abogado(a) nuevo(a)..." : "Guardando abogado(a) nuevo(a)...");
+        const response = await (isEditing ? updateNewBaseLawyerInGoogleSheet(lawyer) : saveNewBaseLawyerToGoogleSheet(lawyer)).catch(error => ({
           ok: false,
           message: error?.message || "No se pudo guardar el abogado(a) nuevo(a)."
         }));
         els.saveNewBaseLawyerButton.disabled = false;
-        els.saveNewBaseLawyerButton.textContent = "Guardar abogado(a) nuevo(a)";
+        els.saveNewBaseLawyerButton.textContent = isEditing ? "Actualizar abogado(a) nuevo(a)" : "Guardar abogado(a) nuevo(a)";
 
         if (!response.ok) {
           els.newBaseLawyerStatus.classList.add("visible");
@@ -4737,25 +4859,42 @@
           return;
         }
 
-        newLawyers.push({
-          ...lawyer,
-          id: "",
-          createdAt: new Date().toISOString(),
-          source: "Abogados nuevos",
-          entryMode: "Abogado(a) nuevo(a)",
-          notes: lawyer.notes || "Abogado(a) nuevo(a), sin registro de turno realizado."
-        });
-        els.newBaseLawyerForm.reset();
-        els.newBaseLawyerActive.value = "Sí";
+        if (isEditing) {
+          newLawyers = newLawyers.map(record =>
+            Number(record.rowNumber) === Number(editingNewBaseLawyerRowNumber)
+              ? {
+                  ...record,
+                  ...lawyer,
+                  source: "Abogados nuevos",
+                  entryMode: "Abogado(a) nuevo(a)",
+                  stateBase: record.stateBase || "Sin turno realizado",
+                  notes: lawyer.notes || "Abogado(a) nuevo(a), sin registro de turno realizado."
+                }
+              : record
+          );
+        } else {
+          newLawyers.push({
+            ...lawyer,
+            id: "",
+            createdAt: new Date().toISOString(),
+            source: "Abogados nuevos",
+            entryMode: "Abogado(a) nuevo(a)",
+            stateBase: "Sin turno realizado",
+            notes: lawyer.notes || "Abogado(a) nuevo(a), sin registro de turno realizado."
+          });
+        }
+        resetNewBaseLawyerForm();
         selectedLawyerKey = "";
         renderAll();
         els.newBaseLawyerStatus.classList.add("visible");
-        els.newBaseLawyerStatus.innerHTML = `<strong>Último abogado(a) nuevo(a) ingresado:</strong> ${escapeHtml(lawyer.name)} · ${escapeHtml(lawyer.rut)} · sincronización enviada a Google Sheets.`;
-        showToast("Abogado(a) nuevo(a) guardado y disponible para búsqueda/ranking.");
+        els.newBaseLawyerStatus.innerHTML = isEditing
+          ? `<strong>Abogado(a) nuevo(a) actualizado:</strong> ${escapeHtml(lawyer.name)} · ${escapeHtml(lawyer.rut)} · sincronización enviada a Google Sheets.`
+          : `<strong>Último abogado(a) nuevo(a) ingresado:</strong> ${escapeHtml(lawyer.name)} · ${escapeHtml(lawyer.rut)} · sincronización enviada a Google Sheets.`;
+        showToast(isEditing ? "Abogado(a) nuevo(a) actualizado." : "Abogado(a) nuevo(a) guardado y disponible para búsqueda/ranking.");
         syncFromSheet().catch(() => renderAll());
       } catch (error) {
         els.saveNewBaseLawyerButton.disabled = false;
-        els.saveNewBaseLawyerButton.textContent = "Guardar abogado(a) nuevo(a)";
+        els.saveNewBaseLawyerButton.textContent = editingNewBaseLawyerRowNumber ? "Actualizar abogado(a) nuevo(a)" : "Guardar abogado(a) nuevo(a)";
         els.newBaseLawyerStatus.classList.add("visible");
         els.newBaseLawyerStatus.innerHTML = `<strong>Error interno:</strong> ${escapeHtml(error?.message || "No se pudo completar el guardado.")}`;
         showToast("No se pudo completar el guardado.");
@@ -5047,6 +5186,17 @@
     els.logoutButton.addEventListener("click", logoutUser);
     els.newBaseLawyerForm.addEventListener("submit", handleNewBaseLawyerSubmit);
     els.saveNewBaseLawyerButton.addEventListener("click", handleNewBaseLawyerSubmit);
+    els.cancelNewBaseLawyerEdit.addEventListener("click", () => {
+      resetNewBaseLawyerForm();
+      els.newBaseLawyerStatus.classList.add("visible");
+      els.newBaseLawyerStatus.innerHTML = "<strong>Edición cancelada:</strong> puedes ingresar un abogado(a) nuevo(a).";
+    });
+    els.newBaseLawyerList.addEventListener("click", event => {
+      const editButton = event.target.closest(".edit-new-base-lawyer");
+      const retireButton = event.target.closest(".retire-new-base-lawyer");
+      if (editButton) startEditNewBaseLawyer(editButton.dataset.key);
+      if (retireButton) retireNewBaseLawyer(retireButton.dataset.key);
+    });
     els.newBaseLawyerRut.addEventListener("input", event => {
       event.target.value = formatRut(event.target.value);
     });
