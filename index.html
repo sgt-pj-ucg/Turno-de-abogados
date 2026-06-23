@@ -2114,10 +2114,10 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzrngSToQ8bnIHqPgaiRSG2cg2KDzeOF9JrNtPYanBfuDhCwv6YWtbIYgcWrrilrIXy/exec";
-    const APP_VERSION = "1.6.4-biblioteca-decretos";
-    const REQUIRED_SCRIPT_VERSION = "2026-06-23-biblioteca-decretos-v20";
+    const APP_VERSION = "1.6.6-decreto-en-ficha";
+    const REQUIRED_SCRIPT_VERSION = "2026-06-23-biblioteca-decretos-v21";
     const ACCEPTED_SCRIPT_VERSIONS = [
-      "2026-06-23-biblioteca-decretos-v20"
+      "2026-06-23-biblioteca-decretos-v21"
     ];
     const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
@@ -3000,7 +3000,7 @@
                   <td>${escapeHtml(turn.court)}</td>
                   <td><span class="badge gold">${escapeHtml(turn.subject)}</span></td>
                   <td><span class="badge ${statusBadgeClass(turn.status)}">${escapeHtml(turn.status)}</span></td>
-                  <td>${displayValue(turn.notes)}</td>
+                  <td>${lawyerTurnObservationHtml(turn)}</td>
                 </tr>
               `).join("")}
             </tbody>
@@ -3557,6 +3557,38 @@
       return "";
     }
 
+    function decreeKey(value) {
+      const extracted = extractDeNumber({ deNumber: value, document: value, notes: value });
+      return String(extracted || value || "")
+        .toLowerCase()
+        .replace(/[^0-9a-z]/g, "");
+    }
+
+    function findDecreeDocument(turn) {
+      const target = decreeKey(extractDeNumber(turn));
+      if (!target) return null;
+      return decrees.find(decree => {
+        const candidates = [decree.deNumber, decree.name, decree.folder]
+          .map(decreeKey)
+          .filter(Boolean);
+        return candidates.some(candidate => candidate === target || candidate.includes(target));
+      }) || null;
+    }
+
+    function lawyerTurnObservationHtml(turn) {
+      const notes = hasData(turn.notes) ? escapeHtml(turn.notes) : "";
+      const deNumber = extractDeNumber(turn);
+      if (!deNumber) return notes || "Sin información";
+
+      const document = findDecreeDocument(turn);
+      const deLabel = `D.E. N° ${deNumber}`;
+      const deHtml = document?.url
+        ? `<a href="${escapeHtml(document.url)}" target="_blank" rel="noopener">${escapeHtml(deLabel)}</a>`
+        : `<strong>${escapeHtml(deLabel)}</strong>`;
+      const designation = `Designado por ${deHtml}`;
+      return notes ? `${notes}<br><span class="muted">${designation}</span>` : designation;
+    }
+
     function monthlyTurnMatchesStatus(turn, filter) {
       if (!filter || filter === "all") return true;
       const type = turnStatusType(turn);
@@ -3804,6 +3836,10 @@
         decrees = await loadDecreesViaAppsScript();
         decreeLoadError = "";
         renderDecrees();
+        if (selectedLawyerKey) {
+          const selectedProfile = groupLawyers().find(profile => profile.key === selectedLawyerKey);
+          if (selectedProfile) renderLawyerDetail(selectedProfile);
+        }
         if (!options.silent) showToast(`Biblioteca actualizada: ${decrees.length} decreto${decrees.length === 1 ? "" : "s"}.`);
       } catch (error) {
         decreeLoadError = error?.message || "Error desconocido.";
