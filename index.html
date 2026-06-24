@@ -1742,7 +1742,7 @@
         <p>Datos conectados a la planilla Google Sheets entregada. La sincronización actualiza búsqueda, ficha y ranking.</p>
         <p id="versionLabel" style="margin-top:-4px;font-size:11px;color:rgba(255,255,255,.58);"></p>
         <button class="btn ghost" id="syncButton" type="button">Sincronizar datos</button>
-        <a class="btn sheet-shortcut" id="sheetShortcut" href="https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/edit?usp=sharing" target="_blank" rel="noopener">Abrir planilla</a>
+        <a class="btn sheet-shortcut" id="sheetShortcut" href="https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/edit?usp=sharing" target="_blank" rel="noopener" hidden>Abrir planilla</a>
       </div>
     </aside>
 
@@ -2196,108 +2196,124 @@
             <span class="badge blue">Guía operativa</span>
           </div>
           <div class="manual-note">
-            <strong>Uso recomendado:</strong> antes de registrar o modificar información, sincroniza los datos y verifica que estés ingresado con tu usuario institucional. Toda actualización relevante quedará asociada al usuario conectado.
+            <strong>Objetivo de la plataforma:</strong> apoyar la búsqueda, revisión, registro y seguimiento de abogados de turno. Cada funcionario debe ingresar con su usuario, revisar cuidadosamente la información antes de guardar y mantener actualizados los datos de contacto.
           </div>
           <div class="manual-grid">
             <article class="manual-card">
               <h4>1. Ingreso a la aplicación</h4>
               <ol>
-                <li>Ingresa tu RUT funcionario en el formato que prefieras; la aplicación lo ordenará automáticamente.</li>
-                <li>Escribe tu clave de 4 dígitos y presiona <strong>Ingresar</strong>.</li>
-                <li>Verifica que tu nombre aparezca en el panel lateral como usuario conectado.</li>
-                <li>Si el acceso falla, revisa RUT, clave y que tu usuario esté habilitado en la planilla de usuarios.</li>
+                <li>Escribe tu RUT funcionario en el campo de ingreso. Puedes digitarlo con o sin puntos; la aplicación lo formateará automáticamente.</li>
+                <li>Ingresa tu clave asignada y presiona <strong>Ingresar</strong>.</li>
+                <li>Al entrar, revisa el panel lateral izquierdo. Debe aparecer tu nombre como <strong>Usuario conectado</strong>.</li>
+                <li>Todas las acciones importantes que realices quedarán asociadas a tu usuario para efectos de trazabilidad.</li>
+                <li>Cuando termines de trabajar, presiona <strong>Cerrar sesión</strong>.</li>
               </ol>
             </article>
 
             <article class="manual-card">
               <h4>2. Sincronizar datos</h4>
               <ol>
-                <li>Presiona <strong>Sincronizar datos</strong> al iniciar la jornada o después de realizar cambios en la planilla.</li>
-                <li>La sincronización actualiza búsqueda, fichas, ranking, alertas, abogados nuevos y biblioteca de decretos.</li>
-                <li>Si un dato no aparece actualizado, sincroniza nuevamente y revisa que el Apps Script publicado sea la versión vigente.</li>
+                <li>Presiona <strong>Sincronizar datos</strong> al iniciar el trabajo en la aplicación.</li>
+                <li>Usa también este botón después de guardar un cambio, incorporar un abogado, registrar un turno o subir un documento.</li>
+                <li>La sincronización actualiza la búsqueda, la ficha de abogados, el ranking, las alertas, los abogados nuevos, los turnos mensuales y la biblioteca de decretos.</li>
+                <li>Espera el mensaje de confirmación antes de continuar con otra tarea.</li>
+                <li>Si no ves un dato recién ingresado, vuelve a sincronizar y revisa nuevamente la sección correspondiente.</li>
               </ol>
             </article>
 
             <article class="manual-card">
               <h4>3. Buscar abogado</h4>
               <ol>
-                <li>Entra a <strong>Buscar abogado</strong> y escribe nombre, apellido o parte del nombre.</li>
-                <li>Usa los filtros de materia, meses sin turno y habilitación cuando necesites acotar resultados.</li>
-                <li>Selecciona un abogado para revisar RUT, contacto, materias históricas, tribunales y turnos realizados.</li>
-                <li>Si corresponde, usa <strong>Editar contacto</strong> para actualizar correo, teléfono o domicilio.</li>
+                <li>En el menú izquierdo, selecciona <strong>Buscar abogado</strong>.</li>
+                <li>Escribe el nombre, apellido o parte del nombre del abogado. La búsqueda muestra coincidencias disponibles en la base.</li>
+                <li>Si necesitas acotar resultados, usa los filtros de materia, meses sin turno y habilitación.</li>
+                <li>Selecciona una tarjeta de resultado para abrir la <strong>Ficha del abogado</strong>.</li>
+                <li>En la ficha revisa RUT, domicilio, teléfono, correo, materias históricas, tribunales, total de turnos y detalle de turnos realizados.</li>
+                <li>Si detectas datos desactualizados, presiona <strong>Editar contacto</strong>, corrige la información y guarda.</li>
               </ol>
             </article>
 
             <article class="manual-card">
               <h4>4. Habilitar o deshabilitar para turno</h4>
               <ol>
-                <li>En la ficha del abogado, selecciona <strong>Sí</strong> o <strong>No</strong> en habilitado para turno.</li>
-                <li>Si seleccionas <strong>No</strong>, indica una causal breve y adjunta el documento de respaldo obligatorio.</li>
-                <li>El cambio se registra en la planilla y queda trazado en el historial con usuario, fecha y motivo.</li>
-                <li>Los abogados no habilitados quedan excluidos del ranking de nuevo turno.</li>
+                <li>En la ficha del abogado, ubica el selector <strong>Habilitado para turno</strong>.</li>
+                <li>Selecciona <strong>Sí</strong> cuando el abogado pueda ser considerado en futuros turnos.</li>
+                <li>Selecciona <strong>No</strong> cuando exista una razón que impida considerarlo en el ranking.</li>
+                <li>Al marcar <strong>No</strong>, debes elegir una causal, escribir una justificación breve y adjuntar el documento de respaldo.</li>
+                <li>Mientras no se adjunte el respaldo solicitado, el sistema no permitirá completar el cambio.</li>
+                <li>Un abogado no habilitado no aparecerá como candidato en el ranking de nuevo turno.</li>
               </ol>
             </article>
 
             <article class="manual-card">
               <h4>5. Registrar abogados nuevos</h4>
               <ol>
-                <li>Ingresa a <strong>Abogados nuevos</strong> cuando el abogado no tenga turnos históricos.</li>
-                <li>Completa RUT, nombre, correo, teléfono, domicilio y estado de habilitación.</li>
-                <li>El RUT es obligatorio para nuevos ingresos.</li>
-                <li>El registro queda en la pestaña <strong>Abogados nuevos</strong>, disponible para búsqueda y con prioridad en ranking por no tener turno realizado.</li>
+                <li>Usa la sección <strong>Abogados nuevos</strong> cuando el abogado aún no tenga turnos históricos registrados.</li>
+                <li>Completa RUT, nombre completo, correo, teléfono, domicilio, estado de habilitación y observaciones si corresponde.</li>
+                <li>El RUT es obligatorio para registrar abogados nuevos.</li>
+                <li>Antes de guardar, revisa que el nombre esté escrito correctamente y que los datos de contacto sean utilizables.</li>
+                <li>El abogado nuevo quedará disponible para búsqueda y ranking sin crear un turno histórico.</li>
+                <li>Cuando ese abogado realice su primer turno, pasará a formar parte de los registros históricos de turnos.</li>
               </ol>
             </article>
 
             <article class="manual-card">
               <h4>6. Generar y registrar nuevo turno</h4>
               <ol>
-                <li>Ingresa a <strong>Nuevo turno</strong> y revisa el ranking de candidatos habilitados.</li>
-                <li>Filtra por materia, tribunal, meses sin turno o busca rápidamente un abogado habilitado.</li>
-                <li>Presiona <strong>Usar este abogado</strong> o <strong>Nuevo abogado</strong> si el ingreso será manual.</li>
-                <li>Completa materia, tribunal, mes, estado y observaciones antes de guardar.</li>
-                <li>Revisa la ventana de confirmación para evitar registros accidentales.</li>
+                <li>Ingresa a <strong>Nuevo turno</strong>.</li>
+                <li>Revisa el ranking sugerido. Los abogados nuevos sin turno realizado aparecen priorizados y los no habilitados quedan excluidos.</li>
+                <li>Usa los filtros de materia, tribunal y meses sin turno para revisar candidatos según la necesidad del turno.</li>
+                <li>También puedes usar el buscador rápido para ubicar un abogado habilitado dentro del ranking.</li>
+                <li>Presiona <strong>Usar este abogado</strong> para llevar sus datos al formulario de registro.</li>
+                <li>Verifica o cambia materia, tribunal, mes, estado y observaciones antes de guardar.</li>
+                <li>Lee la ventana de confirmación y guarda solo si la información está correcta.</li>
               </ol>
             </article>
 
             <article class="manual-card">
               <h4>7. Gestionar excusas y reemplazos</h4>
               <ol>
-                <li>Ingresa a <strong>Excusas y reemplazos</strong>.</li>
-                <li>Busca el turno original por mes, abogado, materia o tribunal.</li>
-                <li>Selecciona el turno que se excusa, registra motivo, D.E. y observación.</li>
-                <li>La aplicación prepara el formulario para ingresar al reemplazante con el mismo mes, materia y tribunal.</li>
-                <li>El abogado excusado no cuenta como turno realizado; el reemplazante queda marcado como realizado por reemplazo.</li>
+                <li>Ingresa a <strong>Excusas y reemplazos</strong> cuando un abogado designado no realizará el turno.</li>
+                <li>Selecciona el mes del turno y busca por nombre, materia o tribunal.</li>
+                <li>Elige el turno original que será marcado como excusado.</li>
+                <li>Registra el motivo de excusa, el número de D.E. y una observación clara.</li>
+                <li>Después de marcar la excusa, el sistema prepara el formulario para registrar al abogado reemplazante.</li>
+                <li>Selecciona o ingresa el reemplazante, revisa materia, tribunal, mes y estado, y guarda el registro.</li>
+                <li>El abogado excusado no cuenta como turno realizado; el reemplazante queda registrado como realizado por reemplazo.</li>
               </ol>
             </article>
 
             <article class="manual-card">
               <h4>8. Revisar turnos mensuales</h4>
               <ol>
-                <li>Ingresa a <strong>Turnos de Abogados</strong>.</li>
-                <li>Selecciona año y mes para revisar el turno conformado.</li>
-                <li>La tabla muestra materia, tribunal, abogado, D.E., contacto, estado y observaciones.</li>
-                <li>Los estados permiten distinguir originales vigentes, excusados y reemplazantes.</li>
+                <li>Ingresa a <strong>Turnos de Abogados</strong> para revisar el turno mensual conformado.</li>
+                <li>Selecciona el año y el mes que deseas consultar.</li>
+                <li>La tabla muestra materia, tribunal, abogado, D.E., datos de contacto, estado y observaciones.</li>
+                <li>Revisa los colores y estados para distinguir originales vigentes, originales reemplazados y reemplazantes vigentes.</li>
+                <li>Esta sección sirve para confirmar rápidamente quién integra un turno mensual y con qué datos de contacto.</li>
               </ol>
             </article>
 
             <article class="manual-card">
               <h4>9. Decretos Económicos</h4>
               <ol>
-                <li>Ingresa a <strong>Decretos Económicos</strong> para buscar documentos cargados en Drive.</li>
-                <li>Filtra por año o busca por número de D.E. o nombre del archivo.</li>
-                <li>Para cargar un nuevo decreto, presiona <strong>Ingresar nuevo decreto económico</strong>.</li>
-                <li>Completa año, mes, número de D.E. y adjunta el PDF correspondiente.</li>
-                <li>La aplicación guarda el documento en la carpeta del año y lo deja disponible en la biblioteca.</li>
+                <li>Ingresa a <strong>Decretos Económicos</strong> para consultar documentos de respaldo disponibles.</li>
+                <li>Filtra por año o busca por número de D.E. o parte del nombre del archivo.</li>
+                <li>Presiona <strong>Ver documento</strong> para abrir el PDF correspondiente.</li>
+                <li>Para cargar un decreto nuevo, presiona <strong>Ingresar nuevo decreto económico</strong>.</li>
+                <li>Completa año, mes, número de D.E. y adjunta el PDF.</li>
+                <li>Después de subirlo, sincroniza o actualiza la biblioteca para confirmar que quedó disponible.</li>
               </ol>
             </article>
 
             <article class="manual-card">
               <h4>10. Alertas e historial</h4>
               <ol>
-                <li>Usa <strong>Alertas de información</strong> para detectar abogados sin correo, teléfono, domicilio, RUT o no habilitados.</li>
-                <li>Completa los datos pendientes desde la misma sección cuando corresponda.</li>
-                <li>El <strong>Registro de cambios</strong> permite auditar modificaciones, pero solo está disponible para jefatura.</li>
-                <li>Si no tienes acceso al historial, la aplicación mostrará el mensaje <strong>Acceso solo para jefatura</strong>.</li>
+                <li>Usa <strong>Alertas de información</strong> para revisar datos incompletos, como abogados sin correo, teléfono, domicilio o RUT.</li>
+                <li>Los campos pendientes se destacan visualmente para facilitar su corrección.</li>
+                <li>Desde esa sección puedes completar datos faltantes y guardar los cambios.</li>
+                <li>El <strong>Registro de cambios</strong> permite revisar quién modificó información, cuándo lo hizo y qué dato cambió.</li>
+                <li>El historial está restringido a jefatura. Si no tienes autorización, verás el mensaje <strong>Acceso solo para jefatura</strong>.</li>
               </ol>
             </article>
           </div>
@@ -2398,7 +2414,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxg9YQBCB4bqHEEHE-RAliNZkEeBwDmUZYvmL6kOfmCvk1jupyzvqZzpHVvi47MbdE/exec";
-    const APP_VERSION = "1.8.2-manual-rapido";
+    const APP_VERSION = "1.8.3-manual-usuarios";
     const REQUIRED_SCRIPT_VERSION = "2026-06-24-history-access-v26";
     const ACCEPTED_SCRIPT_VERSIONS = [
       "2026-06-24-history-access-v26"
@@ -2407,6 +2423,7 @@
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
     const USER_SESSION_STORAGE_KEY = "turnosAbogadosUserSession";
     const HISTORY_ALLOWED_RUTS = new Set(["15870852-3", "13651825-9"].map(normalizeRut));
+    const SHEET_SHORTCUT_ALLOWED_RUTS = new Set(["15870852-3"].map(normalizeRut));
 
     const seedTurns = [
       { name: "Carolina Reyes M.", id: "12.345.678-9", address: "Monjitas 527, Santiago", phone: "+56 9 1111 2222", email: "carolina@example.cl", court: "1° Juzgado Civil", subject: "Civil", date: "2026-01-01", year: "2026", month: "Enero", status: "Cumplido", notes: "Dato de ejemplo" },
@@ -2444,6 +2461,7 @@
       currentUserName: document.querySelector("#currentUserName"),
       currentUserRut: document.querySelector("#currentUserRut"),
       logoutButton: document.querySelector("#logoutButton"),
+      sheetShortcut: document.querySelector("#sheetShortcut"),
       searchName: document.querySelector("#searchName"),
       searchSubject: document.querySelector("#searchSubject"),
       searchMonths: document.querySelector("#searchMonths"),
@@ -2636,6 +2654,15 @@
       return HISTORY_ALLOWED_RUTS.has(normalizeRut(authenticatedUser?.rut || ""));
     }
 
+    function canOpenSheetShortcut() {
+      return SHEET_SHORTCUT_ALLOWED_RUTS.has(normalizeRut(authenticatedUser?.rut || ""));
+    }
+
+    function updateSheetShortcutAccess() {
+      if (!els.sheetShortcut) return;
+      els.sheetShortcut.hidden = !canOpenSheetShortcut();
+    }
+
     function showHistoryAccessDenied() {
       changeHistory = [];
       historyLoadError = "";
@@ -2663,12 +2690,14 @@
       els.appShell.hidden = false;
       els.loginScreen.style.display = "none";
       els.appShell.style.display = "";
+      updateSheetShortcutAccess();
       window.scrollTo({ top: 0, behavior: "auto" });
     }
 
     function logoutUser() {
       authenticatedUser = null;
       sessionStorage.removeItem(USER_SESSION_STORAGE_KEY);
+      updateSheetShortcutAccess();
       els.appShell.hidden = true;
       els.loginScreen.hidden = false;
       els.appShell.style.display = "none";
