@@ -541,6 +541,55 @@
       overflow: hidden;
     }
 
+    .manual-grid {
+      display: grid;
+      grid-template-columns: repeat(2, minmax(0, 1fr));
+      gap: 14px;
+      padding: 18px;
+    }
+
+    .manual-card {
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      padding: 16px;
+    }
+
+    .manual-card h4 {
+      margin: 0 0 8px;
+      color: var(--navy);
+      font-size: 17px;
+    }
+
+    .manual-card p {
+      margin: 0 0 10px;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .manual-card ol,
+    .manual-card ul {
+      margin: 0;
+      padding-left: 20px;
+      color: var(--ink);
+      line-height: 1.55;
+    }
+
+    .manual-card li + li {
+      margin-top: 6px;
+    }
+
+    .manual-note {
+      margin: 18px;
+      border: 1px solid #d7dde8;
+      border-left: 5px solid var(--gold);
+      border-radius: 8px;
+      background: #fffdf5;
+      padding: 14px 16px;
+      color: var(--ink);
+      line-height: 1.5;
+    }
+
     .panel-header {
       display: flex;
       align-items: center;
@@ -1630,7 +1679,7 @@
       .actions { justify-content: stretch; }
       .actions .btn { flex: 1; }
       .contact-toolbar { align-items: flex-start; flex-direction: column; }
-      .metrics, .contact-grid, .summary-grid, .form-grid, .turn-meta-grid, .rank-controls, .alert-grid, .alert-edit-grid, .document-row, .period-picker, .new-lawyer-main-fields, .new-lawyer-contact-fields, .new-lawyer-detail-fields, .new-lawyer-actions, .decree-upload-grid, .decree-upload-actions, .alert-contact-grid { grid-template-columns: 1fr; }
+      .metrics, .contact-grid, .summary-grid, .form-grid, .turn-meta-grid, .rank-controls, .alert-grid, .alert-edit-grid, .document-row, .period-picker, .new-lawyer-main-fields, .new-lawyer-contact-fields, .new-lawyer-detail-fields, .new-lawyer-actions, .decree-upload-grid, .decree-upload-actions, .alert-contact-grid, .manual-grid { grid-template-columns: 1fr; }
       .rank-search { grid-column: span 1; }
       .alert-address-field,
       .alert-save-cell { grid-column: auto; }
@@ -1681,6 +1730,7 @@
         <button type="button" data-view="turns">Turnos de Abogados</button>
         <button type="button" data-view="decrees">Decretos Económicos</button>
         <button type="button" data-view="history">Registro de cambios</button>
+        <button type="button" data-view="manual">Manual rápido</button>
       </nav>
       <div class="user-chip">
         <span>Usuario conectado</span>
@@ -2135,6 +2185,124 @@
           </div>
         </section>
       </section>
+
+      <section class="view" id="manualView">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3>Manual rápido</h3>
+              <p class="muted">Procedimiento básico para el uso diario de la plataforma de Turno de Abogados.</p>
+            </div>
+            <span class="badge blue">Guía operativa</span>
+          </div>
+          <div class="manual-note">
+            <strong>Uso recomendado:</strong> antes de registrar o modificar información, sincroniza los datos y verifica que estés ingresado con tu usuario institucional. Toda actualización relevante quedará asociada al usuario conectado.
+          </div>
+          <div class="manual-grid">
+            <article class="manual-card">
+              <h4>1. Ingreso a la aplicación</h4>
+              <ol>
+                <li>Ingresa tu RUT funcionario en el formato que prefieras; la aplicación lo ordenará automáticamente.</li>
+                <li>Escribe tu clave de 4 dígitos y presiona <strong>Ingresar</strong>.</li>
+                <li>Verifica que tu nombre aparezca en el panel lateral como usuario conectado.</li>
+                <li>Si el acceso falla, revisa RUT, clave y que tu usuario esté habilitado en la planilla de usuarios.</li>
+              </ol>
+            </article>
+
+            <article class="manual-card">
+              <h4>2. Sincronizar datos</h4>
+              <ol>
+                <li>Presiona <strong>Sincronizar datos</strong> al iniciar la jornada o después de realizar cambios en la planilla.</li>
+                <li>La sincronización actualiza búsqueda, fichas, ranking, alertas, abogados nuevos y biblioteca de decretos.</li>
+                <li>Si un dato no aparece actualizado, sincroniza nuevamente y revisa que el Apps Script publicado sea la versión vigente.</li>
+              </ol>
+            </article>
+
+            <article class="manual-card">
+              <h4>3. Buscar abogado</h4>
+              <ol>
+                <li>Entra a <strong>Buscar abogado</strong> y escribe nombre, apellido o parte del nombre.</li>
+                <li>Usa los filtros de materia, meses sin turno y habilitación cuando necesites acotar resultados.</li>
+                <li>Selecciona un abogado para revisar RUT, contacto, materias históricas, tribunales y turnos realizados.</li>
+                <li>Si corresponde, usa <strong>Editar contacto</strong> para actualizar correo, teléfono o domicilio.</li>
+              </ol>
+            </article>
+
+            <article class="manual-card">
+              <h4>4. Habilitar o deshabilitar para turno</h4>
+              <ol>
+                <li>En la ficha del abogado, selecciona <strong>Sí</strong> o <strong>No</strong> en habilitado para turno.</li>
+                <li>Si seleccionas <strong>No</strong>, indica una causal breve y adjunta el documento de respaldo obligatorio.</li>
+                <li>El cambio se registra en la planilla y queda trazado en el historial con usuario, fecha y motivo.</li>
+                <li>Los abogados no habilitados quedan excluidos del ranking de nuevo turno.</li>
+              </ol>
+            </article>
+
+            <article class="manual-card">
+              <h4>5. Registrar abogados nuevos</h4>
+              <ol>
+                <li>Ingresa a <strong>Abogados nuevos</strong> cuando el abogado no tenga turnos históricos.</li>
+                <li>Completa RUT, nombre, correo, teléfono, domicilio y estado de habilitación.</li>
+                <li>El RUT es obligatorio para nuevos ingresos.</li>
+                <li>El registro queda en la pestaña <strong>Abogados nuevos</strong>, disponible para búsqueda y con prioridad en ranking por no tener turno realizado.</li>
+              </ol>
+            </article>
+
+            <article class="manual-card">
+              <h4>6. Generar y registrar nuevo turno</h4>
+              <ol>
+                <li>Ingresa a <strong>Nuevo turno</strong> y revisa el ranking de candidatos habilitados.</li>
+                <li>Filtra por materia, tribunal, meses sin turno o busca rápidamente un abogado habilitado.</li>
+                <li>Presiona <strong>Usar este abogado</strong> o <strong>Nuevo abogado</strong> si el ingreso será manual.</li>
+                <li>Completa materia, tribunal, mes, estado y observaciones antes de guardar.</li>
+                <li>Revisa la ventana de confirmación para evitar registros accidentales.</li>
+              </ol>
+            </article>
+
+            <article class="manual-card">
+              <h4>7. Gestionar excusas y reemplazos</h4>
+              <ol>
+                <li>Ingresa a <strong>Excusas y reemplazos</strong>.</li>
+                <li>Busca el turno original por mes, abogado, materia o tribunal.</li>
+                <li>Selecciona el turno que se excusa, registra motivo, D.E. y observación.</li>
+                <li>La aplicación prepara el formulario para ingresar al reemplazante con el mismo mes, materia y tribunal.</li>
+                <li>El abogado excusado no cuenta como turno realizado; el reemplazante queda marcado como realizado por reemplazo.</li>
+              </ol>
+            </article>
+
+            <article class="manual-card">
+              <h4>8. Revisar turnos mensuales</h4>
+              <ol>
+                <li>Ingresa a <strong>Turnos de Abogados</strong>.</li>
+                <li>Selecciona año y mes para revisar el turno conformado.</li>
+                <li>La tabla muestra materia, tribunal, abogado, D.E., contacto, estado y observaciones.</li>
+                <li>Los estados permiten distinguir originales vigentes, excusados y reemplazantes.</li>
+              </ol>
+            </article>
+
+            <article class="manual-card">
+              <h4>9. Decretos Económicos</h4>
+              <ol>
+                <li>Ingresa a <strong>Decretos Económicos</strong> para buscar documentos cargados en Drive.</li>
+                <li>Filtra por año o busca por número de D.E. o nombre del archivo.</li>
+                <li>Para cargar un nuevo decreto, presiona <strong>Ingresar nuevo decreto económico</strong>.</li>
+                <li>Completa año, mes, número de D.E. y adjunta el PDF correspondiente.</li>
+                <li>La aplicación guarda el documento en la carpeta del año y lo deja disponible en la biblioteca.</li>
+              </ol>
+            </article>
+
+            <article class="manual-card">
+              <h4>10. Alertas e historial</h4>
+              <ol>
+                <li>Usa <strong>Alertas de información</strong> para detectar abogados sin correo, teléfono, domicilio, RUT o no habilitados.</li>
+                <li>Completa los datos pendientes desde la misma sección cuando corresponda.</li>
+                <li>El <strong>Registro de cambios</strong> permite auditar modificaciones, pero solo está disponible para jefatura.</li>
+                <li>Si no tienes acceso al historial, la aplicación mostrará el mensaje <strong>Acceso solo para jefatura</strong>.</li>
+              </ol>
+            </article>
+          </div>
+        </section>
+      </section>
     </main>
   </div>
 
@@ -2230,7 +2398,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxg9YQBCB4bqHEEHE-RAliNZkEeBwDmUZYvmL6kOfmCvk1jupyzvqZzpHVvi47MbdE/exec";
-    const APP_VERSION = "1.8.1-historial-jefatura";
+    const APP_VERSION = "1.8.2-manual-rapido";
     const REQUIRED_SCRIPT_VERSION = "2026-06-24-history-access-v26";
     const ACCEPTED_SCRIPT_VERSIONS = [
       "2026-06-24-history-access-v26"
@@ -4379,6 +4547,7 @@
       const isTurns = view === "turns";
       const isDecrees = view === "decrees";
       const isHistory = view === "history";
+      const isManual = view === "manual";
       document.querySelector("#pageTitle").textContent = isNewTurn
         ? "Generar y registrar nuevo turno"
         : isNewLawyers
@@ -4393,6 +4562,8 @@
                 ? "Decretos Económicos"
                 : isHistory
                   ? "Registro de cambios"
+                  : isManual
+                    ? "Manual rápido"
               : "Consulta institucional de abogados";
       document.querySelector("#pageSubtitle").textContent = isNewTurn
         ? "Revisa el ranking por meses sin turno, especialidades históricas y registra una nueva asignación."
@@ -4408,6 +4579,8 @@
                 ? "Consulta la biblioteca de documentos respaldatorios alojada en Drive."
                 : isHistory
                   ? "Audita las últimas modificaciones de contacto, habilitación, turnos, abogados nuevos y documentos."
+                  : isManual
+                    ? "Guía de uso diario para funcionarios: búsqueda, turnos, excusas, decretos, alertas e historial."
               : "Busca libremente por nombre, revisa datos de contacto y consulta todos los turnos realizados por año, mes, tribunal y materia.";
       if (isHistory && !canViewChangeHistory()) {
         document.querySelector("#pageSubtitle").textContent = "Acceso solo para jefatura.";
