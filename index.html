@@ -1680,6 +1680,7 @@
         <button type="button" data-view="excuses">Excusas y reemplazos</button>
         <button type="button" data-view="turns">Turnos de Abogados</button>
         <button type="button" data-view="decrees">Decretos Económicos</button>
+        <button type="button" data-view="history">Registro de cambios</button>
       </nav>
       <div class="user-chip">
         <span>Usuario conectado</span>
@@ -2116,6 +2117,24 @@
           </div>
         </section>
       </section>
+
+      <section class="view" id="historyView">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <h3>Registro de cambios</h3>
+              <p class="muted">Consulta las últimas actualizaciones realizadas por usuarios en la aplicación.</p>
+            </div>
+            <div class="decree-panel-actions">
+              <span class="badge blue" id="historyCount">0 registros</span>
+              <button class="btn" id="refreshHistory" type="button">Actualizar historial</button>
+            </div>
+          </div>
+          <div class="alert-detail" id="historyList">
+            <div class="empty">El historial se cargará desde la hoja Historial_Cambios.</div>
+          </div>
+        </section>
+      </section>
     </main>
   </div>
 
@@ -2211,10 +2230,10 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxg9YQBCB4bqHEEHE-RAliNZkEeBwDmUZYvmL6kOfmCvk1jupyzvqZzpHVvi47MbdE/exec";
-    const APP_VERSION = "1.7.3-estados-finales";
-    const REQUIRED_SCRIPT_VERSION = "2026-06-23-subida-decretos-v24";
+    const APP_VERSION = "1.8.0-historial-validaciones";
+    const REQUIRED_SCRIPT_VERSION = "2026-06-24-history-validation-v25";
     const ACCEPTED_SCRIPT_VERSIONS = [
-      "2026-06-23-subida-decretos-v24"
+      "2026-06-24-history-validation-v25"
     ];
     const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
@@ -2230,6 +2249,8 @@
     let newLawyers = [];
     let decrees = [];
     let decreeLoadError = "";
+    let changeHistory = [];
+    let historyLoadError = "";
     let editingNewBaseLawyerRowNumber = null;
     let selectedLawyerKey = "";
     let rankingMinMonths = 0;
@@ -2316,6 +2337,9 @@
       refreshDecrees: document.querySelector("#refreshDecrees"),
       decreeCount: document.querySelector("#decreeCount"),
       decreeList: document.querySelector("#decreeList"),
+      refreshHistory: document.querySelector("#refreshHistory"),
+      historyCount: document.querySelector("#historyCount"),
+      historyList: document.querySelector("#historyList"),
       confirmModal: document.querySelector("#confirmModal"),
       confirmBody: document.querySelector("#confirmBody"),
       cancelConfirm: document.querySelector("#cancelConfirm"),
@@ -4100,6 +4124,96 @@
       }
     }
 
+    function renderChangeHistory() {
+      if (!els.historyList || !els.historyCount) return;
+      els.historyCount.textContent = `${changeHistory.length} registro${changeHistory.length === 1 ? "" : "s"}`;
+
+      if (historyLoadError) {
+        els.historyList.innerHTML = `<div class="empty">No se pudo cargar el historial: ${escapeHtml(historyLoadError)}</div>`;
+        return;
+      }
+
+      if (!changeHistory.length) {
+        els.historyList.innerHTML = `<div class="empty">Aún no hay registros en Historial_Cambios.</div>`;
+        return;
+      }
+
+      els.historyList.innerHTML = changeHistory.map(entry => `
+        <article class="alert-lawyer-card">
+          <div class="alert-card-head">
+            <div>
+              <strong>${escapeHtml(entry.lawyer || "Sin abogado informado")}</strong>
+              <p class="muted" style="margin:4px 0 0;">${escapeHtml(entry.date || "Sin fecha")} · ${escapeHtml(entry.user || "Usuario no informado")}</p>
+            </div>
+            <span class="badge blue">${escapeHtml(entry.type || "Cambio")}</span>
+          </div>
+          <div class="alert-contact-grid">
+            <div><span>Campo</span><strong>${displayValue(entry.field)}</strong></div>
+            <div><span>Valor anterior</span><strong>${displayValue(entry.oldValue)}</strong></div>
+            <div><span>Valor nuevo</span><strong>${displayValue(entry.newValue)}</strong></div>
+            <div><span>Origen</span><strong>${displayValue(entry.origin)}</strong></div>
+          </div>
+          ${entry.reason ? `<p class="save-note"><strong>Motivo:</strong> ${escapeHtml(entry.reason)}</p>` : ""}
+          ${entry.documentUrl ? `<p class="save-note"><strong>Respaldo:</strong> <a href="${escapeHtml(entry.documentUrl)}" target="_blank" rel="noopener">Ver documento</a></p>` : ""}
+        </article>
+      `).join("");
+    }
+
+    function loadChangeHistoryViaAppsScript() {
+      if (!GOOGLE_APPS_SCRIPT_URL) return Promise.resolve([]);
+      return new Promise((resolve, reject) => {
+        const callbackName = `history_${Date.now()}_${Math.round(Math.random() * 100000)}`;
+        const script = document.createElement("script");
+        const timer = window.setTimeout(() => {
+          cleanup();
+          reject(new Error("Apps Script no respondió al cargar historial."));
+        }, 12000);
+
+        function cleanup() {
+          window.clearTimeout(timer);
+          script.remove();
+          delete window[callbackName];
+        }
+
+        window[callbackName] = payload => {
+          cleanup();
+          if (payload?.ok && Array.isArray(payload.history)) {
+            resolve(payload.history);
+          } else {
+            reject(new Error(payload?.message || "Apps Script no devolvió historial válido."));
+          }
+        };
+
+        script.onerror = () => {
+          cleanup();
+          reject(new Error("No se pudo conectar con Apps Script para cargar historial."));
+        };
+
+        const params = new URLSearchParams({
+          action: "history",
+          callback: callbackName,
+          limit: 100,
+          cacheBust: Date.now()
+        });
+        script.src = `${GOOGLE_APPS_SCRIPT_URL}?${params.toString()}`;
+        document.head.appendChild(script);
+      });
+    }
+
+    async function syncChangeHistory(options = {}) {
+      try {
+        if (!options.silent) showToast("Actualizando registro de cambios...");
+        changeHistory = await loadChangeHistoryViaAppsScript();
+        historyLoadError = "";
+        renderChangeHistory();
+        if (!options.silent) showToast(`Historial actualizado: ${changeHistory.length} registro${changeHistory.length === 1 ? "" : "s"}.`);
+      } catch (error) {
+        historyLoadError = error?.message || "Error desconocido.";
+        renderChangeHistory();
+        if (!options.silent) showToast(historyLoadError);
+      }
+    }
+
     async function handleExcuseReplacement() {
       if (!canWriteSafely()) return;
       const turn = selectedExcuseTurn();
@@ -4186,6 +4300,7 @@
       renderExcuseTurnOptions();
       renderMonthlyTurns();
       renderDecrees();
+      renderChangeHistory();
     }
 
     function renderNewBaseLawyers() {
@@ -4232,6 +4347,7 @@
       const isExcuses = view === "excuses";
       const isTurns = view === "turns";
       const isDecrees = view === "decrees";
+      const isHistory = view === "history";
       document.querySelector("#pageTitle").textContent = isNewTurn
         ? "Generar y registrar nuevo turno"
         : isNewLawyers
@@ -4244,6 +4360,8 @@
               ? "Turnos de Abogados"
               : isDecrees
                 ? "Decretos Económicos"
+                : isHistory
+                  ? "Registro de cambios"
               : "Consulta institucional de abogados";
       document.querySelector("#pageSubtitle").textContent = isNewTurn
         ? "Revisa el ranking por meses sin turno, especialidades históricas y registra una nueva asignación."
@@ -4257,7 +4375,12 @@
               ? "Busca por año y mes, revisa titulares, excusas, reemplazos, D.E. y datos de contacto del turno mensual."
               : isDecrees
                 ? "Consulta la biblioteca de documentos respaldatorios alojada en Drive."
+                : isHistory
+                  ? "Audita las últimas modificaciones de contacto, habilitación, turnos, abogados nuevos y documentos."
               : "Busca libremente por nombre, revisa datos de contacto y consulta todos los turnos realizados por año, mes, tribunal y materia.";
+      if (isHistory && !changeHistory.length && !historyLoadError) {
+        syncChangeHistory({ silent: true });
+      }
       updateFloatingButtons();
     }
 
@@ -4986,6 +5109,7 @@
       } : turn);
       renderAll();
       showToast(`Datos actualizados en Google Sheets: ${profile.name}.`);
+      syncChangeHistory({ silent: true });
       syncFromSheet({ keepSelected: true }).catch(() => renderAll());
     }
 
@@ -5035,6 +5159,7 @@
       renderAll();
       renderLawyerDetail(groupLawyers().find(item => item.key === key));
       showToast(`Datos actualizados: ${profile.name}.`);
+      syncChangeHistory({ silent: true });
       syncFromSheet({ keepSelected: true }).catch(() => renderAll());
     }
 
@@ -5082,6 +5207,7 @@
       }
 
       showToast(`Habilitación actualizada: ${profile.name} quedó en ${enabledValue}.`);
+      syncChangeHistory({ silent: true });
       if (evidence?.fileData) {
         showToast("Cambio enviado con documento adjunto. Sincronizaré en unos segundos para confirmar la planilla.");
         window.setTimeout(() => {
@@ -5311,6 +5437,11 @@
           els.newBaseLawyerStatus.classList.add("visible");
           els.newBaseLawyerStatus.innerHTML = `<strong>Registro pendiente:</strong> ${escapeHtml(contactValidation.errors[0])}`;
           showToast(contactValidation.errors[0]);
+          return;
+        }
+        if (contactValidation.warnings.length && !window.confirm(`Advertencias:\n- ${contactValidation.warnings.join("\n- ")}\n\n¿Guardar abogado(a) nuevo(a) de todos modos?`)) {
+          els.newBaseLawyerStatus.classList.add("visible");
+          els.newBaseLawyerStatus.innerHTML = "<strong>Guardado cancelado:</strong> revisa los datos pendientes antes de continuar.";
           return;
         }
 
@@ -5607,6 +5738,7 @@
     els.monthlyTurnSearch.addEventListener(eventName, () => window.setTimeout(renderMonthlyTurns, 0));
     });
     els.refreshDecrees.addEventListener("click", () => syncDecrees());
+    els.refreshHistory.addEventListener("click", () => syncChangeHistory());
     els.openDecreeUpload.addEventListener("click", openDecreeUploadModal);
     els.cancelDecreeUpload.addEventListener("click", closeDecreeUploadModal);
     els.decreeUploadModal.addEventListener("click", event => {
