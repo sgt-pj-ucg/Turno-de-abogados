@@ -475,24 +475,21 @@
     }
 
     .decree-upload-form {
-      padding: 18px;
       display: grid;
       gap: 14px;
-      border-bottom: 1px solid var(--line);
-      background: #fff;
     }
 
     .decree-upload-grid {
       display: grid;
-      grid-template-columns: minmax(140px, .45fr) minmax(140px, .45fr) minmax(220px, .8fr) minmax(280px, 1.2fr);
+      grid-template-columns: repeat(2, minmax(0, 1fr));
       gap: 14px;
       align-items: end;
     }
 
     .decree-upload-actions {
       display: grid;
-      grid-template-columns: minmax(0, 1fr) minmax(230px, 340px);
-      gap: 16px;
+      grid-template-columns: 1fr;
+      gap: 10px;
       align-items: center;
       border-top: 1px solid var(--line);
       padding-top: 14px;
@@ -507,6 +504,29 @@
     .decree-upload-actions .btn {
       min-height: 48px;
       width: 100%;
+    }
+
+    .decree-panel-header {
+      gap: 14px;
+    }
+
+    .decree-panel-actions {
+      display: flex;
+      align-items: center;
+      justify-content: flex-end;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+
+    .decree-open-button {
+      box-shadow: 0 12px 22px rgba(20,33,61,.16);
+    }
+
+    .modal-subtitle {
+      margin: 6px 0 0;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 1.45;
     }
 
     .new-lawyer-list-panel .lawyer-results {
@@ -2069,39 +2089,16 @@
 
       <section class="view" id="decreesView">
         <section class="panel">
-          <div class="panel-header">
+          <div class="panel-header decree-panel-header">
             <div>
               <h3>Biblioteca de Decretos Económicos</h3>
               <p class="muted">Consulta documentos disponibles en la carpeta Drive institucional.</p>
             </div>
-            <span class="badge blue" id="decreeCount">0 documentos</span>
+            <div class="decree-panel-actions">
+              <span class="badge blue" id="decreeCount">0 documentos</span>
+              <button class="btn primary decree-open-button" id="openDecreeUpload" type="button">Ingresar nuevo decreto económico</button>
+            </div>
           </div>
-          <form id="decreeUploadForm" class="decree-upload-form" novalidate>
-            <p class="save-note"><strong>Nuevo decreto:</strong> sube el PDF y la aplicación lo guardará en Drive dentro del año indicado, con nombre uniforme para búsqueda mensual.</p>
-            <div class="decree-upload-grid">
-              <div class="field">
-                <label for="decreeUploadYear">Año</label>
-                <select id="decreeUploadYear" required></select>
-              </div>
-              <div class="field">
-                <label for="decreeUploadMonth">Mes</label>
-                <select id="decreeUploadMonth" required></select>
-              </div>
-              <div class="field">
-                <label for="decreeUploadNumber">Número D.E.</label>
-                <input id="decreeUploadNumber" placeholder="Ej. 159-2026" required>
-              </div>
-              <div class="field">
-                <label for="decreeUploadFile">Documento PDF</label>
-                <input id="decreeUploadFile" type="file" accept="application/pdf,.pdf" required>
-              </div>
-            </div>
-            <div class="decree-upload-actions">
-              <p>Formato sugerido: <strong>04. D.E. N°159-2026.pdf</strong>. El mes permite ordenar los documentos del 01 al 12.</p>
-              <button class="btn primary" id="uploadDecreeButton" type="button">Subir decreto económico</button>
-            </div>
-            <div class="last-save" id="decreeUploadStatus"></div>
-          </form>
           <div class="rank-controls">
             <div class="field rank-search">
               <label for="decreeSearch">Buscar D.E. o documento</label>
@@ -2130,6 +2127,46 @@
       <div class="modal-actions">
         <button class="btn" id="cancelConfirm" type="button">Cancelar</button>
         <button class="btn primary" id="acceptConfirm" type="button">Confirmar y guardar</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="modal-backdrop" id="decreeUploadModal" role="dialog" aria-modal="true" aria-labelledby="decreeUploadTitle">
+    <div class="modal">
+      <header>
+        <h3 id="decreeUploadTitle">Ingresar nuevo decreto económico</h3>
+        <p class="modal-subtitle">Adjunta el PDF y completa los datos para que quede disponible en la biblioteca institucional.</p>
+      </header>
+      <div class="modal-body">
+        <form id="decreeUploadForm" class="decree-upload-form" novalidate>
+          <p class="save-note"><strong>Destino:</strong> el PDF se guardará en Drive dentro del año indicado, con nombre uniforme para búsqueda mensual.</p>
+          <div class="decree-upload-grid">
+            <div class="field">
+              <label for="decreeUploadYear">Año</label>
+              <select id="decreeUploadYear" required></select>
+            </div>
+            <div class="field">
+              <label for="decreeUploadMonth">Mes</label>
+              <select id="decreeUploadMonth" required></select>
+            </div>
+            <div class="field">
+              <label for="decreeUploadNumber">Número D.E.</label>
+              <input id="decreeUploadNumber" placeholder="Ej. 159-2026" required>
+            </div>
+            <div class="field">
+              <label for="decreeUploadFile">Documento PDF</label>
+              <input id="decreeUploadFile" type="file" accept="application/pdf,.pdf" required>
+            </div>
+          </div>
+          <div class="decree-upload-actions">
+            <p>Formato sugerido: <strong>04. D.E. N°159-2026.pdf</strong>. El mes permite ordenar los documentos del 01 al 12.</p>
+            <div class="last-save" id="decreeUploadStatus"></div>
+          </div>
+        </form>
+      </div>
+      <div class="modal-actions">
+        <button class="btn" id="cancelDecreeUpload" type="button">Cancelar</button>
+        <button class="btn primary" id="uploadDecreeButton" type="button">Subir decreto económico</button>
       </div>
     </div>
   </div>
@@ -2175,7 +2212,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxg9YQBCB4bqHEEHE-RAliNZkEeBwDmUZYvmL6kOfmCvk1jupyzvqZzpHVvi47MbdE/exec";
-    const APP_VERSION = "1.7.1-subida-decretos";
+    const APP_VERSION = "1.7.2-modal-decretos";
     const REQUIRED_SCRIPT_VERSION = "2026-06-23-subida-decretos-v24";
     const ACCEPTED_SCRIPT_VERSIONS = [
       "2026-06-23-subida-decretos-v24"
@@ -2266,11 +2303,14 @@
       monthlyTurnBadge: document.querySelector("#monthlyTurnBadge"),
       monthlyTurnSummary: document.querySelector("#monthlyTurnSummary"),
       monthlyTurnResults: document.querySelector("#monthlyTurnResults"),
+      openDecreeUpload: document.querySelector("#openDecreeUpload"),
+      decreeUploadModal: document.querySelector("#decreeUploadModal"),
       decreeUploadYear: document.querySelector("#decreeUploadYear"),
       decreeUploadMonth: document.querySelector("#decreeUploadMonth"),
       decreeUploadNumber: document.querySelector("#decreeUploadNumber"),
       decreeUploadFile: document.querySelector("#decreeUploadFile"),
       uploadDecreeButton: document.querySelector("#uploadDecreeButton"),
+      cancelDecreeUpload: document.querySelector("#cancelDecreeUpload"),
       decreeUploadStatus: document.querySelector("#decreeUploadStatus"),
       decreeSearch: document.querySelector("#decreeSearch"),
       decreeYearFilter: document.querySelector("#decreeYearFilter"),
@@ -3900,6 +3940,21 @@
       els.decreeUploadStatus.style.color = kind === "error" ? "#9f2f24" : "#315f59";
     }
 
+    function openDecreeUploadModal() {
+      populateDecreeUploadOptions();
+      if (els.decreeUploadStatus) {
+        els.decreeUploadStatus.classList.remove("visible");
+        els.decreeUploadStatus.innerHTML = "";
+      }
+      els.decreeUploadModal.classList.add("visible");
+      window.setTimeout(() => els.decreeUploadNumber?.focus(), 0);
+    }
+
+    function closeDecreeUploadModal(force = false) {
+      if (!force && els.uploadDecreeButton?.disabled) return;
+      els.decreeUploadModal.classList.remove("visible");
+    }
+
     async function readFilePayload(file) {
       return fileToEvidencePayload(file);
     }
@@ -3955,6 +4010,7 @@
             resetDecreeUploadForm();
             populateDecreeUploadOptions();
             setDecreeUploadStatus(`<strong>Decreto cargado.</strong> Ya está disponible en la biblioteca como D.E. N° ${escapeHtml(deNumber)}.`, "success");
+            window.setTimeout(() => closeDecreeUploadModal(true), 900);
           } else {
             setDecreeUploadStatus(`<strong>No pude confirmar la carga.</strong> Revisa permisos de Drive o publica el Apps Script actualizado; luego presiona “Actualizar biblioteca”.`, "error");
           }
@@ -5530,9 +5586,14 @@
     els.monthlyTurnMonth.addEventListener("change", renderMonthlyTurns);
     els.monthlyTurnStatus.addEventListener("change", renderMonthlyTurns);
     ["input", "search", "keyup", "paste"].forEach(eventName => {
-      els.monthlyTurnSearch.addEventListener(eventName, () => window.setTimeout(renderMonthlyTurns, 0));
+    els.monthlyTurnSearch.addEventListener(eventName, () => window.setTimeout(renderMonthlyTurns, 0));
     });
     els.refreshDecrees.addEventListener("click", () => syncDecrees());
+    els.openDecreeUpload.addEventListener("click", openDecreeUploadModal);
+    els.cancelDecreeUpload.addEventListener("click", closeDecreeUploadModal);
+    els.decreeUploadModal.addEventListener("click", event => {
+      if (event.target === els.decreeUploadModal) closeDecreeUploadModal();
+    });
     els.uploadDecreeButton.addEventListener("click", uploadEconomicDecreeFromForm);
     els.decreeYearFilter.addEventListener("change", renderDecrees);
     ["input", "search", "keyup", "paste"].forEach(eventName => {
