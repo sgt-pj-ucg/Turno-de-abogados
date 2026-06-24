@@ -2230,14 +2230,15 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxg9YQBCB4bqHEEHE-RAliNZkEeBwDmUZYvmL6kOfmCvk1jupyzvqZzpHVvi47MbdE/exec";
-    const APP_VERSION = "1.8.0-historial-validaciones";
-    const REQUIRED_SCRIPT_VERSION = "2026-06-24-history-validation-v25";
+    const APP_VERSION = "1.8.1-historial-jefatura";
+    const REQUIRED_SCRIPT_VERSION = "2026-06-24-history-access-v26";
     const ACCEPTED_SCRIPT_VERSIONS = [
-      "2026-06-24-history-validation-v25"
+      "2026-06-24-history-access-v26"
     ];
     const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
     const USER_SESSION_STORAGE_KEY = "turnosAbogadosUserSession";
+    const HISTORY_ALLOWED_RUTS = new Set(["15870852-3", "13651825-9"].map(normalizeRut));
 
     const seedTurns = [
       { name: "Carolina Reyes M.", id: "12.345.678-9", address: "Monjitas 527, Santiago", phone: "+56 9 1111 2222", email: "carolina@example.cl", court: "1° Juzgado Civil", subject: "Civil", date: "2026-01-01", year: "2026", month: "Enero", status: "Cumplido", notes: "Dato de ejemplo" },
@@ -2461,6 +2462,24 @@
 
     function currentSessionToken() {
       return authenticatedUser?.token || "";
+    }
+
+    function canViewChangeHistory() {
+      return HISTORY_ALLOWED_RUTS.has(normalizeRut(authenticatedUser?.rut || ""));
+    }
+
+    function showHistoryAccessDenied() {
+      changeHistory = [];
+      historyLoadError = "";
+      if (els.historyCount) els.historyCount.textContent = "Restringido";
+      if (els.historyList) {
+        els.historyList.innerHTML = `
+          <div class="empty">
+            <strong>Acceso solo para jefatura.</strong>
+            <br>El registro de cambios está restringido a usuarios autorizados.
+          </div>
+        `;
+      }
     }
 
     function showAuthenticatedApp(user) {
@@ -4126,6 +4145,11 @@
 
     function renderChangeHistory() {
       if (!els.historyList || !els.historyCount) return;
+      if (!canViewChangeHistory()) {
+        showHistoryAccessDenied();
+        return;
+      }
+
       els.historyCount.textContent = `${changeHistory.length} registro${changeHistory.length === 1 ? "" : "s"}`;
 
       if (historyLoadError) {
@@ -4192,6 +4216,7 @@
         const params = new URLSearchParams({
           action: "history",
           callback: callbackName,
+          actorToken: currentSessionToken(),
           limit: 100,
           cacheBust: Date.now()
         });
@@ -4201,6 +4226,12 @@
     }
 
     async function syncChangeHistory(options = {}) {
+      if (!canViewChangeHistory()) {
+        showHistoryAccessDenied();
+        if (!options.silent) showToast("Acceso solo para jefatura.");
+        return;
+      }
+
       try {
         if (!options.silent) showToast("Actualizando registro de cambios...");
         changeHistory = await loadChangeHistoryViaAppsScript();
@@ -4378,6 +4409,13 @@
                 : isHistory
                   ? "Audita las últimas modificaciones de contacto, habilitación, turnos, abogados nuevos y documentos."
               : "Busca libremente por nombre, revisa datos de contacto y consulta todos los turnos realizados por año, mes, tribunal y materia.";
+      if (isHistory && !canViewChangeHistory()) {
+        document.querySelector("#pageSubtitle").textContent = "Acceso solo para jefatura.";
+        showHistoryAccessDenied();
+        showToast("Acceso solo para jefatura.");
+        updateFloatingButtons();
+        return;
+      }
       if (isHistory && !changeHistory.length && !historyLoadError) {
         syncChangeHistory({ silent: true });
       }
