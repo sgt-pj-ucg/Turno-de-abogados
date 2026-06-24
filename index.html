@@ -2613,8 +2613,8 @@
       if (email && !/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(email)) {
         errors.push("El correo no parece válido.");
       }
-      if (phone && phoneDigits.length < 7) {
-        errors.push("El teléfono debe tener al menos 7 dígitos.");
+      if (phone && phoneDigits.length < 9) {
+        errors.push("El teléfono debe tener al menos 9 dígitos.");
       }
       if (!email) warnings.push("El correo quedará vacío.");
       if (!phone) warnings.push("El teléfono quedará vacío.");
