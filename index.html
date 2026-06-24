@@ -474,6 +474,41 @@
       margin: 0;
     }
 
+    .decree-upload-form {
+      padding: 18px;
+      display: grid;
+      gap: 14px;
+      border-bottom: 1px solid var(--line);
+      background: #fff;
+    }
+
+    .decree-upload-grid {
+      display: grid;
+      grid-template-columns: minmax(140px, .45fr) minmax(140px, .45fr) minmax(220px, .8fr) minmax(280px, 1.2fr);
+      gap: 14px;
+      align-items: end;
+    }
+
+    .decree-upload-actions {
+      display: grid;
+      grid-template-columns: minmax(0, 1fr) minmax(230px, 340px);
+      gap: 16px;
+      align-items: center;
+      border-top: 1px solid var(--line);
+      padding-top: 14px;
+    }
+
+    .decree-upload-actions p {
+      margin: 0;
+      color: var(--muted);
+      line-height: 1.45;
+    }
+
+    .decree-upload-actions .btn {
+      min-height: 48px;
+      width: 100%;
+    }
+
     .new-lawyer-list-panel .lawyer-results {
       max-height: none;
     }
@@ -1575,7 +1610,7 @@
       .actions { justify-content: stretch; }
       .actions .btn { flex: 1; }
       .contact-toolbar { align-items: flex-start; flex-direction: column; }
-      .metrics, .contact-grid, .summary-grid, .form-grid, .turn-meta-grid, .rank-controls, .alert-grid, .alert-edit-grid, .document-row, .period-picker, .new-lawyer-main-fields, .new-lawyer-contact-fields, .new-lawyer-detail-fields, .new-lawyer-actions, .alert-contact-grid { grid-template-columns: 1fr; }
+      .metrics, .contact-grid, .summary-grid, .form-grid, .turn-meta-grid, .rank-controls, .alert-grid, .alert-edit-grid, .document-row, .period-picker, .new-lawyer-main-fields, .new-lawyer-contact-fields, .new-lawyer-detail-fields, .new-lawyer-actions, .decree-upload-grid, .decree-upload-actions, .alert-contact-grid { grid-template-columns: 1fr; }
       .rank-search { grid-column: span 1; }
       .alert-address-field,
       .alert-save-cell { grid-column: auto; }
@@ -2041,6 +2076,32 @@
             </div>
             <span class="badge blue" id="decreeCount">0 documentos</span>
           </div>
+          <form id="decreeUploadForm" class="decree-upload-form" novalidate>
+            <p class="save-note"><strong>Nuevo decreto:</strong> sube el PDF y la aplicación lo guardará en Drive dentro del año indicado, con nombre uniforme para búsqueda mensual.</p>
+            <div class="decree-upload-grid">
+              <div class="field">
+                <label for="decreeUploadYear">Año</label>
+                <select id="decreeUploadYear" required></select>
+              </div>
+              <div class="field">
+                <label for="decreeUploadMonth">Mes</label>
+                <select id="decreeUploadMonth" required></select>
+              </div>
+              <div class="field">
+                <label for="decreeUploadNumber">Número D.E.</label>
+                <input id="decreeUploadNumber" placeholder="Ej. 159-2026" required>
+              </div>
+              <div class="field">
+                <label for="decreeUploadFile">Documento PDF</label>
+                <input id="decreeUploadFile" type="file" accept="application/pdf,.pdf" required>
+              </div>
+            </div>
+            <div class="decree-upload-actions">
+              <p>Formato sugerido: <strong>04. D.E. N°159-2026.pdf</strong>. El mes permite ordenar los documentos del 01 al 12.</p>
+              <button class="btn primary" id="uploadDecreeButton" type="button">Subir decreto económico</button>
+            </div>
+            <div class="last-save" id="decreeUploadStatus"></div>
+          </form>
           <div class="rank-controls">
             <div class="field rank-search">
               <label for="decreeSearch">Buscar D.E. o documento</label>
@@ -2114,10 +2175,10 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbwXmjYkU0-NfuoCa1eRDMbWt5ilZdRSJ_zNc3AivsfAY1l0AVFIyMhPhmZ_I96pmo-u/exec";
-    const APP_VERSION = "1.7.0-biblioteca-mes-ordenado";
-    const REQUIRED_SCRIPT_VERSION = "2026-06-23-biblioteca-decretos-v23";
+    const APP_VERSION = "1.7.1-subida-decretos";
+    const REQUIRED_SCRIPT_VERSION = "2026-06-23-subida-decretos-v24";
     const ACCEPTED_SCRIPT_VERSIONS = [
-      "2026-06-23-biblioteca-decretos-v23"
+      "2026-06-23-subida-decretos-v24"
     ];
     const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
@@ -2205,6 +2266,12 @@
       monthlyTurnBadge: document.querySelector("#monthlyTurnBadge"),
       monthlyTurnSummary: document.querySelector("#monthlyTurnSummary"),
       monthlyTurnResults: document.querySelector("#monthlyTurnResults"),
+      decreeUploadYear: document.querySelector("#decreeUploadYear"),
+      decreeUploadMonth: document.querySelector("#decreeUploadMonth"),
+      decreeUploadNumber: document.querySelector("#decreeUploadNumber"),
+      decreeUploadFile: document.querySelector("#decreeUploadFile"),
+      uploadDecreeButton: document.querySelector("#uploadDecreeButton"),
+      decreeUploadStatus: document.querySelector("#decreeUploadStatus"),
       decreeSearch: document.querySelector("#decreeSearch"),
       decreeYearFilter: document.querySelector("#decreeYearFilter"),
       refreshDecrees: document.querySelector("#refreshDecrees"),
@@ -3770,6 +3837,7 @@
     function renderDecrees() {
       if (!els.decreeList || !els.decreeCount) return;
       populateDecreeFilters();
+      populateDecreeUploadOptions();
       const visible = filteredDecrees();
       els.decreeCount.textContent = `${visible.length} documento${visible.length === 1 ? "" : "s"}`;
 
@@ -3802,6 +3870,102 @@
           </div>
         </article>
       `).join("");
+    }
+
+    function populateDecreeUploadOptions() {
+      if (!els.decreeUploadYear || !els.decreeUploadMonth) return;
+      const currentYear = new Date().getFullYear();
+      const knownYears = new Set(decreeYears().map(String));
+      for (let year = currentYear + 1; year >= 2021; year--) knownYears.add(String(year));
+      const selectedYear = els.decreeUploadYear.value || String(currentYear);
+      els.decreeUploadYear.innerHTML = [...knownYears]
+        .sort((a, b) => String(b).localeCompare(String(a)))
+        .map(year => `<option value="${escapeHtml(year)}">${escapeHtml(year)}</option>`)
+        .join("");
+      els.decreeUploadYear.value = knownYears.has(selectedYear) ? selectedYear : String(currentYear);
+
+      const selectedMonth = els.decreeUploadMonth.value || String(new Date().getMonth() + 1).padStart(2, "0");
+      els.decreeUploadMonth.innerHTML = MONTH_OPTIONS
+        .map(([value, label]) => `<option value="${value}">${value} - ${label}</option>`)
+        .join("");
+      els.decreeUploadMonth.value = selectedMonth;
+    }
+
+    function setDecreeUploadStatus(message, kind = "info") {
+      if (!els.decreeUploadStatus) return;
+      els.decreeUploadStatus.classList.add("visible");
+      els.decreeUploadStatus.innerHTML = message;
+      els.decreeUploadStatus.style.borderColor = kind === "error" ? "#f4b8b1" : kind === "success" ? "#b8dfd2" : "#d7dde8";
+      els.decreeUploadStatus.style.background = kind === "error" ? "#fff5f3" : kind === "success" ? "#f0fbf7" : "#f8fafc";
+      els.decreeUploadStatus.style.color = kind === "error" ? "#9f2f24" : "#315f59";
+    }
+
+    async function readFilePayload(file) {
+      return fileToEvidencePayload(file);
+    }
+
+    function resetDecreeUploadForm() {
+      if (els.decreeUploadNumber) els.decreeUploadNumber.value = "";
+      if (els.decreeUploadFile) els.decreeUploadFile.value = "";
+    }
+
+    async function uploadEconomicDecreeFromForm() {
+      if (!(await canWriteSafelyAsync())) return;
+      const year = els.decreeUploadYear?.value || "";
+      const month = els.decreeUploadMonth?.value || "";
+      const deNumber = els.decreeUploadNumber?.value.trim() || "";
+      const file = els.decreeUploadFile?.files?.[0];
+
+      if (!year || !month || !deNumber || !file) {
+        setDecreeUploadStatus("<strong>Faltan datos:</strong> completa año, mes, número de D.E. y adjunta el PDF.", "error");
+        return;
+      }
+      if (!file.name.toLowerCase().endsWith(".pdf")) {
+        setDecreeUploadStatus("<strong>Archivo no válido:</strong> adjunta un documento PDF.", "error");
+        return;
+      }
+      if (file.size > DISABLE_FILE_MAX_BYTES) {
+        setDecreeUploadStatus("<strong>Archivo muy pesado:</strong> usa un PDF de hasta 8 MB.", "error");
+        return;
+      }
+
+      els.uploadDecreeButton.disabled = true;
+      els.uploadDecreeButton.textContent = "Subiendo...";
+      setDecreeUploadStatus("<strong>Preparando archivo...</strong> Leyendo PDF para enviarlo a Drive.", "info");
+
+      try {
+        const filePayload = await readFilePayload(file);
+        const payload = {
+          year,
+          month,
+          deNumber,
+          notes: "Carga desde biblioteca de decretos económicos",
+          ...filePayload,
+          actorToken: currentSessionToken(),
+          actor: currentActor()
+        };
+        setDecreeUploadStatus("<strong>Enviando a Drive...</strong> El decreto se guardará en la carpeta del año seleccionado.", "info");
+        await postToAppsScriptForm("uploaddecree", payload);
+        setDecreeUploadStatus("<strong>Solicitud enviada.</strong> Actualizando biblioteca para confirmar el nuevo documento.", "success");
+        window.setTimeout(async () => {
+          await syncDecrees({ silent: true });
+          const expected = normalize(deNumber);
+          const exists = decrees.some(decree => normalize([decree.deNumber, decree.name].join(" ")).includes(expected));
+          if (exists) {
+            resetDecreeUploadForm();
+            populateDecreeUploadOptions();
+            setDecreeUploadStatus(`<strong>Decreto cargado.</strong> Ya está disponible en la biblioteca como D.E. N° ${escapeHtml(deNumber)}.`, "success");
+          } else {
+            setDecreeUploadStatus(`<strong>No pude confirmar la carga.</strong> Revisa permisos de Drive o publica el Apps Script actualizado; luego presiona “Actualizar biblioteca”.`, "error");
+          }
+          els.uploadDecreeButton.disabled = false;
+          els.uploadDecreeButton.textContent = "Subir decreto económico";
+        }, 4500);
+      } catch (error) {
+        setDecreeUploadStatus(`<strong>No se pudo subir:</strong> ${escapeHtml(error?.message || "Error desconocido.")}`, "error");
+        els.uploadDecreeButton.disabled = false;
+        els.uploadDecreeButton.textContent = "Subir decreto económico";
+      }
     }
 
     function loadDecreesViaAppsScript() {
@@ -5369,6 +5533,7 @@
       els.monthlyTurnSearch.addEventListener(eventName, () => window.setTimeout(renderMonthlyTurns, 0));
     });
     els.refreshDecrees.addEventListener("click", () => syncDecrees());
+    els.uploadDecreeButton.addEventListener("click", uploadEconomicDecreeFromForm);
     els.decreeYearFilter.addEventListener("change", renderDecrees);
     ["input", "search", "keyup", "paste"].forEach(eventName => {
       els.decreeSearch.addEventListener(eventName, () => window.setTimeout(renderDecrees, 0));
