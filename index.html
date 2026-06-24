@@ -2415,6 +2415,7 @@
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxg9YQBCB4bqHEEHE-RAliNZkEeBwDmUZYvmL6kOfmCvk1jupyzvqZzpHVvi47MbdE/exec";
     const APP_VERSION = "1.8.3-manual-usuarios";
+    const DISPLAY_VERSION = "Versión N°1, 24.06.2026";
     const REQUIRED_SCRIPT_VERSION = "2026-06-24-history-access-v26";
     const ACCEPTED_SCRIPT_VERSIONS = [
       "2026-06-24-history-access-v26"
@@ -4967,7 +4968,7 @@
           cleanup();
           publishedScriptVersion = payload?.version || "";
           scriptVersionOk = ACCEPTED_SCRIPT_VERSIONS.includes(publishedScriptVersion);
-          document.querySelector("#versionLabel").textContent = `Versión ${APP_VERSION}`;
+          document.querySelector("#versionLabel").textContent = DISPLAY_VERSION;
           if (!scriptVersionOk) {
             showToast(`Apps Script publicado: ${publishedScriptVersion || "sin versión"}. No se enviarán cambios de habilitación hasta publicar ${REQUIRED_SCRIPT_VERSION}.`);
           }
@@ -6053,7 +6054,7 @@
     }
 
     function initializeAppData() {
-      document.querySelector("#versionLabel").textContent = `Versión ${APP_VERSION}`;
+      document.querySelector("#versionLabel").textContent = DISPLAY_VERSION;
       renderAll();
       renderLawyerDetail(null);
       checkAppsScriptVersion();
