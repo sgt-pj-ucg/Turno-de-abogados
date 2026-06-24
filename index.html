@@ -1974,8 +1974,7 @@
                     <option>Original vigente</option>
                     <option>Turno realizado</option>
                     <option>Original reemplazado</option>
-                    <option>Excusado</option>
-                    <option>Realizado por reemplazo</option>
+                    <option>Reemplazante vigente</option>
                     <option>Anulado</option>
                   </select>
                 </div>
@@ -2046,7 +2045,7 @@
               <textarea id="excuseNotes" placeholder="Antecedentes breves para registrar al reemplazante"></textarea>
             </div>
             <button class="btn primary" id="excuseReplacementButton" type="button">Marcar excusa y preparar reemplazo</button>
-            <p class="field-help">El turno original quedará como “Excusado” y luego se abrirá el formulario de nuevo turno con el mismo mes, materia y tribunal para ingresar al reemplazante.</p>
+            <p class="field-help">El turno original quedará como “Original reemplazado” y luego se abrirá el formulario de nuevo turno con el mismo mes, materia y tribunal para ingresar al reemplazante.</p>
           </div>
         </section>
       </section>
@@ -2073,9 +2072,9 @@
               <label for="monthlyTurnStatus">Estado</label>
               <select id="monthlyTurnStatus">
                 <option value="all">Todos</option>
-                <option value="active">Vigentes / realizados</option>
-                <option value="excused">Excusados</option>
-                <option value="replacement">Reemplazos</option>
+                <option value="active">Originales vigentes / realizados</option>
+                <option value="excused">Originales reemplazados</option>
+                <option value="replacement">Reemplazantes</option>
               </select>
             </div>
             <button class="btn primary rank-action" id="refreshMonthlyTurns" type="button">Mostrar turno</button>
@@ -2212,7 +2211,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbxg9YQBCB4bqHEEHE-RAliNZkEeBwDmUZYvmL6kOfmCvk1jupyzvqZzpHVvi47MbdE/exec";
-    const APP_VERSION = "1.7.2-modal-decretos";
+    const APP_VERSION = "1.7.3-estados-finales";
     const REQUIRED_SCRIPT_VERSION = "2026-06-23-subida-decretos-v24";
     const ACCEPTED_SCRIPT_VERSIONS = [
       "2026-06-23-subida-decretos-v24"
@@ -2748,13 +2747,35 @@
       return normalize(value || "");
     }
 
+    function canonicalTurnStatus(status) {
+      const raw = String(status || "").trim();
+      const key = statusKey(raw);
+      if (!key) return "";
+      if (key.includes("realizado por reemplazo") || key.includes("reemplazante")) return "Reemplazante vigente";
+      if (key.includes("original reemplaz") || key.includes("reemplazad") || key.includes("excus")) return "Original reemplazado";
+      if (key.includes("turno realizado") || key.includes("cumplid") || key === "realizado") return "Turno realizado";
+      if (key.includes("programad")) return "Programado";
+      if (key.includes("anulad")) return "Anulado";
+      if (key.includes("original vigente") || key.includes("vigente")) return "Original vigente";
+      return raw;
+    }
+
+    function isReplacementStatus(status) {
+      const canonical = statusKey(canonicalTurnStatus(status));
+      return canonical.includes("reemplazante vigente");
+    }
+
+    function isExcusedOriginalStatus(status) {
+      const canonical = statusKey(canonicalTurnStatus(status));
+      return canonical.includes("original reemplazado") || canonical.includes("excusado");
+    }
+
     function countsAsPerformedTurn(status) {
-      const key = statusKey(status);
+      const key = statusKey(canonicalTurnStatus(status));
       if (!key) return true;
-      if (key.includes("realizado por reemplazo")) return true;
-      if (key.includes("excus")) return false;
-      if (key.includes("reemplazad")) return false;
+      if (key.includes("reemplazante vigente")) return true;
       if (key.includes("original reemplaz")) return false;
+      if (key.includes("excus")) return false;
       if (key.includes("anulad")) return false;
       if (key.includes("programad")) return false;
       if (key.includes("reagend")) return false;
@@ -2762,14 +2783,13 @@
     }
 
     function isExcuseOrReplacementStatus(status) {
-      const key = statusKey(status);
-      return key.includes("excus") || key.includes("reemplazad") || key.includes("original reemplaz");
+      return isExcusedOriginalStatus(status);
     }
 
     function statusBadgeClass(status) {
-      const key = statusKey(status);
-      if (key.includes("excus") || key.includes("reemplazad") || key.includes("anulad")) return "red";
-      if (key.includes("reemplazo") || key.includes("reemplazante")) return "gold";
+      const key = statusKey(canonicalTurnStatus(status));
+      if (key.includes("original reemplaz") || key.includes("excus") || key.includes("anulad")) return "red";
+      if (key.includes("reemplazante vigente")) return "gold";
       if (key.includes("programad") || key.includes("reagend")) return "blue";
       return "green";
     }
@@ -3106,7 +3126,7 @@
                   <td>${escapeHtml(turn.month)}</td>
                   <td>${escapeHtml(turn.court)}</td>
                   <td><span class="badge gold">${escapeHtml(turn.subject)}</span></td>
-                  <td><span class="badge ${statusBadgeClass(turn.status)}">${escapeHtml(turn.status)}</span></td>
+                  <td><span class="badge ${statusBadgeClass(turn.status)}">${escapeHtml(canonicalTurnStatus(turn.status) || "Sin estado")}</span></td>
                   <td>${lawyerTurnObservationHtml(turn)}</td>
                 </tr>
               `).join("")}
@@ -3528,9 +3548,8 @@
     }
 
     function isExcusableTurn(turn) {
-      const key = statusKey(turn.status);
-      if (key.includes("excus") || key.includes("reemplazad") || key.includes("anulad")) return false;
-      if (key.includes("realizado por reemplazo")) return false;
+      const key = statusKey(canonicalTurnStatus(turn.status));
+      if (key.includes("original reemplaz") || key.includes("reemplazante vigente") || key.includes("excus") || key.includes("anulad")) return false;
       return Boolean(turn.name && turn.date);
     }
 
@@ -3553,7 +3572,7 @@
       const candidates = excuseCandidates();
       els.excuseTurnSelect.innerHTML = candidates.length
         ? candidates.slice(0, 160).map(turn => {
-          const label = `${turn.month} ${turn.year} · ${turn.subject} · ${turn.court} · ${turn.name} · ${turn.status}`;
+          const label = `${turn.month} ${turn.year} · ${turn.subject} · ${turn.court} · ${turn.name} · ${canonicalTurnStatus(turn.status) || "Sin estado"}`;
           return `<option value="${escapeHtml(turnRecordKey(turn))}">${escapeHtml(label)}</option>`;
         }).join("")
         : `<option value="">No hay turnos disponibles con estos filtros</option>`;
@@ -3637,12 +3656,11 @@
     }
 
     function turnStatusType(turn) {
-      const key = statusKey(turn.status);
+      const key = statusKey(canonicalTurnStatus(turn.status));
       const notesKey = normalize(turn.notes || "");
       const combined = `${key} ${notesKey}`;
-      if (combined.includes("abogado reemplazante") || combined.includes("reemplazante vigente") || combined.includes("realizado por reemplazo")) return "replacement";
-      if (key.includes("excus") || key.includes("original reemplaz") || key.includes("reemplazad")) return "excused";
-      if (key.includes("reemplazo") || key.includes("reemplazante")) return "replacement";
+      if (combined.includes("abogado reemplazante") || key.includes("reemplazante vigente")) return "replacement";
+      if (key.includes("original reemplaz") || key.includes("excus")) return "excused";
       return "active";
     }
 
@@ -3748,9 +3766,9 @@
       els.monthlyTurnSummary.innerHTML = `
         <div class="info-box"><span>Periodo</span><strong>${escapeHtml(periodLabel(period))}</strong></div>
         <div class="info-box"><span>Registros del mes</span><strong>${periodTurns.length}</strong></div>
-        <div class="info-box"><span>Vigentes / realizados</span><strong>${activeCount}</strong></div>
-        <div class="info-box"><span>Excusados</span><strong>${excusedCount}</strong></div>
-        <div class="info-box"><span>Reemplazos</span><strong>${replacementCount}</strong></div>
+        <div class="info-box"><span>Originales vigentes / realizados</span><strong>${activeCount}</strong></div>
+        <div class="info-box"><span>Originales reemplazados</span><strong>${excusedCount}</strong></div>
+        <div class="info-box"><span>Reemplazantes</span><strong>${replacementCount}</strong></div>
         <div class="info-box"><span>Mostrados</span><strong>${displayedTurns.length}</strong></div>
       `;
 
@@ -3806,7 +3824,7 @@
                   </td>
                   <td>
                     <div class="turn-state">
-                      <span class="badge ${type === "replacement" ? "gold" : statusBadgeClass(turn.status)}">${escapeHtml(type === "replacement" && !statusKey(turn.status).includes("reemplaz") ? "Reemplazante vigente" : (turn.status || "Sin estado"))}</span>
+                      <span class="badge ${type === "replacement" ? "gold" : statusBadgeClass(turn.status)}">${escapeHtml(canonicalTurnStatus(turn.status) || "Sin estado")}</span>
                       ${type === "excused" ? `<span class="muted">No cuenta como turno realizado</span>` : ""}
                     </div>
                   </td>
@@ -4099,7 +4117,7 @@
       }
       const notes = appendExcuseNotes(turn, reason, deNumber, extraNotes);
       const confirmed = window.confirm(
-        `Se marcará como Excusado el turno de:\n\n${turn.name}\n${turn.month} ${turn.year} · ${turn.subject} · ${turn.court}\n\nLuego se preparará el formulario para ingresar al reemplazante.`
+        `Se marcará como Original reemplazado el turno de:\n\n${turn.name}\n${turn.month} ${turn.year} · ${turn.subject} · ${turn.court}\n\nLuego se preparará el formulario para ingresar al reemplazante.`
       );
       if (!confirmed) return;
 
@@ -4126,7 +4144,7 @@
       document.querySelector("#turnDate").value = String(turn.date).slice(0, 7);
       document.querySelector("#subjectInput").value = turn.subject || "";
       document.querySelector("#courtInput").value = turn.court || "";
-      document.querySelector("#statusInput").value = "Realizado por reemplazo";
+      document.querySelector("#statusInput").value = "Reemplazante vigente";
       document.querySelector("#enabledInput").value = "Sí";
       document.querySelector("#lawyerName").value = "";
       document.querySelector("#lawyerRut").value = "";
@@ -4313,7 +4331,7 @@
 
     function exportCsv() {
       const header = ["Nombre", "Correo", "Teléfono", "Dirección", "Tribunal", "Materia", "Fecha", "Estado", "Observaciones"];
-      const rows = turns.map(turn => [turn.name, turn.email, turn.phone, turn.address, turn.court, turn.subject, turn.date, turn.status, turn.notes]);
+      const rows = turns.map(turn => [turn.name, turn.email, turn.phone, turn.address, turn.court, turn.subject, turn.date, canonicalTurnStatus(turn.status) || turn.status, turn.notes]);
       const csv = [header, ...rows].map(row => row.map(csvEscape).join(",")).join("\n");
       const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
       const url = URL.createObjectURL(blob);
@@ -5112,7 +5130,7 @@
           <div class="info-box"><span>Materia</span><strong>${escapeHtml(turn.subject)}</strong></div>
           <div class="info-box"><span>Tribunal</span><strong>${escapeHtml(turn.court)}</strong></div>
           <div class="info-box"><span>Mes</span><strong>${escapeHtml(turn.month)} ${escapeHtml(turn.year)}</strong></div>
-          <div class="info-box"><span>Estado</span><strong>${escapeHtml(turn.status)}</strong></div>
+          <div class="info-box"><span>Estado</span><strong>${escapeHtml(canonicalTurnStatus(turn.status) || "Sin estado")}</strong></div>
           <div class="info-box"><span>Habilitado turno</span><strong>${escapeHtml(turn.active)}</strong></div>
           <div class="info-box"><span>Correo</span><strong>${displayValue(turn.email)}</strong></div>
           <div class="info-box"><span>Teléfono</span><strong>${displayValue(turn.phone)}</strong></div>
@@ -5454,7 +5472,7 @@
         date: `${monthValue}-01`,
         year: monthValue.slice(0, 4),
         month: monthFmt.format(parseDate(`${monthValue}-01`)).split(" de ")[0],
-        status: document.querySelector("#statusInput").value,
+        status: canonicalTurnStatus(document.querySelector("#statusInput").value) || "Programado",
         active: document.querySelector("#enabledInput").value || "Sí",
         notes: finalNotes,
         deNumber: extractDeNumber({ notes: finalNotes })
