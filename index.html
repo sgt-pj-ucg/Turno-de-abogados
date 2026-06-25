@@ -705,6 +705,10 @@
       overflow-wrap: anywhere;
     }
 
+    .history-change-grid + .history-change-grid {
+      margin-top: 10px;
+    }
+
     .alert-contact-grid .pending-cell {
       background: #f5f7fa;
       border-color: #d8dee8;
@@ -2414,7 +2418,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1ibluVbe3JQ9AnOoZzZCsjinJ7Mkrjxah2ONjdbGlcBVE_itH-PQnhE-aooQ_FF1z/exec";
-    const APP_VERSION = "1.8.8-auditoria-integridad";
+    const APP_VERSION = "1.8.9-decreto-asociado";
     const DISPLAY_VERSION = "Versión N°1, 24.06.2026";
     const REQUIRED_SCRIPT_VERSION = "2026-06-25-integrity-audit-v30";
     const ACCEPTED_SCRIPT_VERSIONS = [
@@ -2599,6 +2603,70 @@
 
     function displayValue(value) {
       return value && String(value).trim() ? escapeHtml(value) : "Sin información";
+    }
+
+    const HISTORY_COMPOSITE_LABELS = [
+      "RUT abogado(a)",
+      "Nombre completo",
+      "Correo",
+      "Teléfono",
+      "Domicilio",
+      "Habilitado para turno",
+      "Observaciones"
+    ];
+
+    function splitHistoryCompositeValue(value) {
+      const text = String(value || "").trim();
+      if (!text.includes("|")) return [];
+      return text.split("|").map(part => part.trim());
+    }
+
+    function comparableHistoryValue(value) {
+      return normalize(String(value || "").replace(/\s*\|\s*/g, " | "));
+    }
+
+    function changedHistoryFields(entry) {
+      const previousParts = splitHistoryCompositeValue(entry.oldValue);
+      const newParts = splitHistoryCompositeValue(entry.newValue);
+      const isComposite = previousParts.length > 1 || newParts.length > 1;
+      if (!isComposite) {
+        return [{
+          field: entry.field,
+          oldValue: entry.oldValue,
+          newValue: entry.newValue
+        }];
+      }
+
+      const length = Math.max(previousParts.length, newParts.length, HISTORY_COMPOSITE_LABELS.length);
+      const changes = [];
+      for (let index = 0; index < length; index += 1) {
+        const oldValue = previousParts[index] || "";
+        const newValue = newParts[index] || "";
+        if (comparableHistoryValue(oldValue) !== comparableHistoryValue(newValue)) {
+          changes.push({
+            field: HISTORY_COMPOSITE_LABELS[index] || `Dato ${index + 1}`,
+            oldValue,
+            newValue
+          });
+        }
+      }
+
+      return changes.length ? changes : [{
+        field: entry.field,
+        oldValue: entry.oldValue,
+        newValue: entry.newValue
+      }];
+    }
+
+    function renderHistoryChangeGrid(entry) {
+      return changedHistoryFields(entry).map(change => `
+        <div class="alert-contact-grid history-change-grid">
+          <div><span>Campo modificado</span><strong>${displayValue(change.field)}</strong></div>
+          <div><span>Valor anterior</span><strong>${displayValue(change.oldValue)}</strong></div>
+          <div><span>Valor nuevo</span><strong>${displayValue(change.newValue)}</strong></div>
+          <div><span>Origen</span><strong>${displayValue(entry.origin)}</strong></div>
+        </div>
+      `).join("");
     }
 
     function pendingFieldClass(value) {
@@ -3930,23 +3998,83 @@
         .replace(/[^0-9a-z]/g, "");
     }
 
+    function monthCodeFromText(value) {
+      const key = normalize(value);
+      const months = {
+        enero: "01",
+        febrero: "02",
+        marzo: "03",
+        abril: "04",
+        mayo: "05",
+        junio: "06",
+        julio: "07",
+        agosto: "08",
+        septiembre: "09",
+        setiembre: "09",
+        octubre: "10",
+        noviembre: "11",
+        diciembre: "12"
+      };
+      return months[key] || "";
+    }
+
+    function decreeMonthCode(decree) {
+      if (decree?.month) {
+        const month = Number(decree.month);
+        return month >= 1 && month <= 12 ? String(month).padStart(2, "0") : "";
+      }
+      const name = String(decree?.name || "");
+      const yearPrefix = name.match(/^\s*20[0-9]{2}\D+([0-9]{1,2})\b/);
+      const monthPrefix = yearPrefix || name.match(/^\s*([0-9]{1,2})\D/);
+      if (!monthPrefix) return "";
+      const month = Number(monthPrefix[1]);
+      return month >= 1 && month <= 12 ? String(month).padStart(2, "0") : "";
+    }
+
+    function turnMonthCode(turn) {
+      const dateMatch = String(turn?.date || "").match(/^[0-9]{4}-([0-9]{2})/);
+      if (dateMatch) return dateMatch[1];
+      return monthCodeFromText(turn?.month || "");
+    }
+
+    function decreeNumberFromDocument(decree) {
+      return extractDeNumber({
+        deNumber: decree?.deNumber,
+        document: decree?.name,
+        documentSource: decree?.folder
+      });
+    }
+
+    function findDecreeByTurnPeriod(turn) {
+      const year = String(turn?.year || String(turn?.date || "").slice(0, 4) || "");
+      const month = turnMonthCode(turn);
+      if (!year || !month || !decrees.length) return null;
+      const matches = decrees.filter(decree =>
+        String(decree.year || "") === year && decreeMonthCode(decree) === month
+      );
+      return matches.length === 1 ? matches[0] : null;
+    }
+
     function findDecreeDocument(turn) {
       const target = decreeKey(extractDeNumber(turn));
-      if (!target) return null;
-      return decrees.find(decree => {
-        const candidates = [decree.deNumber, decree.name, decree.folder]
-          .map(decreeKey)
-          .filter(Boolean);
-        return candidates.some(candidate => candidate === target || candidate.includes(target));
-      }) || null;
+      if (target) {
+        const exactDocument = decrees.find(decree => {
+          const candidates = [decree.deNumber, decree.name, decree.folder]
+            .map(decreeKey)
+            .filter(Boolean);
+          return candidates.some(candidate => candidate === target || candidate.includes(target));
+        });
+        if (exactDocument) return exactDocument;
+      }
+      return findDecreeByTurnPeriod(turn);
     }
 
     function lawyerTurnObservationHtml(turn) {
       const notes = hasData(turn.notes) ? escapeHtml(turn.notes) : "";
-      const deNumber = extractDeNumber(turn);
+      const document = findDecreeDocument(turn);
+      const deNumber = extractDeNumber(turn) || decreeNumberFromDocument(document);
       if (!deNumber) return notes || "Sin información";
 
-      const document = findDecreeDocument(turn);
       const deLabel = `D.E. N° ${deNumber}`;
       const deHtml = document?.url
         ? `<a href="${escapeHtml(document.url)}" target="_blank" rel="noopener">${escapeHtml(deLabel)}</a>`
@@ -4096,10 +4224,7 @@
     }
 
     function decreeMonthNumber(decree) {
-      const name = String(decree?.name || "");
-      const match = name.match(/^\s*20[0-9]{2}\D+([0-9]{1,2})\b/);
-      if (!match) return 99;
-      const month = Number(match[1]);
+      const month = Number(decreeMonthCode(decree));
       return month >= 1 && month <= 12 ? month : 99;
     }
 
@@ -4369,12 +4494,7 @@
             </div>
             <span class="badge blue">${escapeHtml(entry.type || "Cambio")}</span>
           </div>
-          <div class="alert-contact-grid">
-            <div><span>Campo</span><strong>${displayValue(entry.field)}</strong></div>
-            <div><span>Valor anterior</span><strong>${displayValue(entry.oldValue)}</strong></div>
-            <div><span>Valor nuevo</span><strong>${displayValue(entry.newValue)}</strong></div>
-            <div><span>Origen</span><strong>${displayValue(entry.origin)}</strong></div>
-          </div>
+          ${renderHistoryChangeGrid(entry)}
           ${entry.reason ? `<p class="save-note"><strong>Motivo:</strong> ${escapeHtml(entry.reason)}</p>` : ""}
           ${entry.documentUrl ? `<p class="save-note"><strong>Respaldo:</strong> <a href="${escapeHtml(entry.documentUrl)}" target="_blank" rel="noopener">Ver documento</a></p>` : ""}
         </article>
