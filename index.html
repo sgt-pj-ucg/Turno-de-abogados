@@ -2418,7 +2418,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1ibluVbe3JQ9AnOoZzZCsjinJ7Mkrjxah2ONjdbGlcBVE_itH-PQnhE-aooQ_FF1z/exec";
-    const APP_VERSION = "1.8.9-decreto-asociado";
+    const APP_VERSION = "1.9.1-busqueda-nombre-compuesta";
     const DISPLAY_VERSION = "Versión N°1, 24.06.2026";
     const REQUIRED_SCRIPT_VERSION = "2026-06-25-integrity-audit-v30";
     const ACCEPTED_SCRIPT_VERSIONS = [
@@ -3285,16 +3285,38 @@
       fillDatalist(document.querySelector("#subjectOptions"), subjects);
     }
 
+    function profileMatchesLawyerName(profile, rawText) {
+      const text = normalize(rawText || "");
+      if (!text) return true;
+
+      // Keep single-term search flexible, including RUT searches.
+      if (/\d/.test(text)) return profile.nameSearchText.includes(text);
+
+      const terms = text.split(/\s+/).filter(Boolean);
+      if (terms.length <= 1) return profile.nameSearchText.includes(text);
+
+      const nameOnlyText = normalize([
+        profile.name,
+        ...profile.turns.map(turn => turn.name),
+        ...profile.newLawyerRecords.map(lawyer => lawyer.name)
+      ].join(" "));
+      const nameTokens = nameOnlyText.split(/\s+/).filter(Boolean);
+      return terms.every(term =>
+        nameTokens.some(token => token === term || token.startsWith(term))
+      );
+    }
+
     function filteredProfiles() {
       const searchInput = document.querySelector("#searchName");
-      const text = normalize(searchInput ? searchInput.value : "");
+      const rawText = searchInput ? searchInput.value : "";
       const subject = els.searchSubject.value;
       const minMonths = Number(els.searchMonths.value || 0);
       const activeFilter = els.searchActive.value;
       return groupLawyers().filter(profile => {
-        const matchesText = !text || profile.nameSearchText.includes(text);
-        const matchesSubject = text ? true : (!subject || profile.subjects.includes(subject));
-        const matchesMonths = text ? true : profile.rankingMonths >= minMonths;
+        const matchesText = profileMatchesLawyerName(profile, rawText);
+        const hasSearchText = Boolean(normalize(rawText || ""));
+        const matchesSubject = hasSearchText ? true : (!subject || profile.subjects.includes(subject));
+        const matchesMonths = hasSearchText ? true : profile.rankingMonths >= minMonths;
         const matchesActive = activeFilter === "all"
           || (activeFilter === "yes" && profile.active)
           || (activeFilter === "no" && !profile.active);
@@ -3998,6 +4020,49 @@
         .replace(/[^0-9a-z]/g, "");
     }
 
+    function compactKey(value) {
+      return normalize(value).replace(/[^0-9a-z]/g, "");
+    }
+
+    function deNumberVariants(deNumber, year = "") {
+      const normalized = extractDeNumber({ deNumber, document: deNumber, notes: deNumber }) || String(deNumber || "").trim();
+      const parts = normalized.match(/^([0-9]{1,6})(?:[-/](20[0-9]{2}|[0-9]{2}))?$/);
+      if (!parts) return [compactKey(normalized)].filter(Boolean);
+      const number = parts[1];
+      const detectedYear = parts[2] ? (parts[2].length === 2 ? `20${parts[2]}` : parts[2]) : "";
+      const finalYear = detectedYear || String(year || "").match(/^20[0-9]{2}$/)?.[0] || "";
+      return [
+        number,
+        finalYear ? `${number}-${finalYear}` : "",
+        finalYear ? `${number}/${finalYear}` : "",
+        finalYear ? `de${number}${finalYear}` : "",
+        finalYear ? `den${number}${finalYear}` : ""
+      ].map(compactKey).filter(Boolean);
+    }
+
+    function deNumberParts(value, fallbackYear = "") {
+      const normalized = extractDeNumber({ deNumber: value, document: value, notes: value }) || String(value || "").trim();
+      const parts = normalized.match(/^([0-9]{1,6})(?:[-/](20[0-9]{2}|[0-9]{2}))?$/);
+      if (!parts) return { number: "", year: "" };
+      const detectedYear = parts[2] ? (parts[2].length === 2 ? `20${parts[2]}` : parts[2]) : "";
+      return {
+        number: parts[1],
+        year: detectedYear || String(fallbackYear || "").match(/^20[0-9]{2}$/)?.[0] || ""
+      };
+    }
+
+    function decreeMatchKeys(decree) {
+      const keys = new Set();
+      [decree?.deNumber, decree?.name, decree?.folder].forEach(value => {
+        const key = decreeKey(value);
+        if (key) keys.add(key);
+        const compact = compactKey(value);
+        if (compact) keys.add(compact);
+      });
+      deNumberVariants(decreeNumberFromDocument(decree), decree?.year).forEach(key => keys.add(key));
+      return [...keys].filter(Boolean);
+    }
+
     function monthCodeFromText(value) {
       const key = normalize(value);
       const months = {
@@ -4056,13 +4121,18 @@
     }
 
     function findDecreeDocument(turn) {
-      const target = decreeKey(extractDeNumber(turn));
-      if (target) {
+      const targetDeNumber = extractDeNumber(turn);
+      const targetYear = String(turn?.year || String(turn?.date || "").slice(0, 4) || "");
+      const targetParts = deNumberParts(targetDeNumber, targetYear);
+      const targetVariants = deNumberVariants(targetDeNumber, targetYear);
+      if (targetVariants.length) {
         const exactDocument = decrees.find(decree => {
-          const candidates = [decree.deNumber, decree.name, decree.folder]
-            .map(decreeKey)
-            .filter(Boolean);
-          return candidates.some(candidate => candidate === target || candidate.includes(target));
+          const decreeParts = deNumberParts(decreeNumberFromDocument(decree), decree?.year);
+          if (targetParts.year && decreeParts.year && targetParts.year !== decreeParts.year) return false;
+          const candidates = decreeMatchKeys(decree);
+          return targetVariants.some(target =>
+            candidates.some(candidate => candidate === target || candidate.includes(target) || target.includes(candidate))
+          );
         });
         if (exactDocument) return exactDocument;
       }
