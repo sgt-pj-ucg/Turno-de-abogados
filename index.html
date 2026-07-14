@@ -1188,9 +1188,9 @@
     .monthly-table .col-subject { width: 12%; }
     .monthly-table .col-court { width: 16%; }
     .monthly-table .col-lawyer { width: 19%; }
-    .monthly-table .col-de { width: 7%; }
-    .monthly-table .col-contact { width: 28%; }
-    .monthly-table .col-status { width: 13%; }
+    .monthly-table .col-de { width: 8%; }
+    .monthly-table .col-contact { width: 25%; }
+    .monthly-table .col-status { width: 15%; }
     .monthly-table .col-notes { width: 15%; }
 
     .monthly-table .badge {
@@ -1214,6 +1214,30 @@
       line-height: 1.25;
       white-space: nowrap;
       font-weight: 600;
+    }
+
+    .turn-status-editor {
+      display: grid;
+      gap: 8px;
+      min-width: 150px;
+    }
+
+    .turn-status-editor select {
+      width: 100%;
+      height: 36px;
+      border: 1px solid var(--line);
+      border-radius: 8px;
+      background: #fff;
+      color: var(--ink);
+      font: inherit;
+      font-size: 13px;
+      padding: 0 8px;
+    }
+
+    .turn-status-editor .btn {
+      min-height: 34px;
+      padding: 7px 10px;
+      font-size: 13px;
     }
 
     .turn-person {
@@ -2023,6 +2047,11 @@
                   <input id="turnDate" type="month" required>
                 </div>
                 <div class="field">
+                  <label for="deNumberInput">D.E. de designación</label>
+                  <input id="deNumberInput" placeholder="Ej. 159-2026">
+                  <p class="field-help">Si el documento está en biblioteca, quedará enlazado en la ficha y turnos.</p>
+                </div>
+                <div class="field">
                   <label for="statusInput">Estado</label>
                   <select id="statusInput">
                     <option>Programado</option>
@@ -2418,7 +2447,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1ibluVbe3JQ9AnOoZzZCsjinJ7Mkrjxah2ONjdbGlcBVE_itH-PQnhE-aooQ_FF1z/exec";
-    const APP_VERSION = "1.9.1-busqueda-nombre-compuesta";
+    const APP_VERSION = "1.9.3-decreto-match-estricto";
     const DISPLAY_VERSION = "Versión N°1, 24.06.2026";
     const REQUIRED_SCRIPT_VERSION = "2026-06-25-integrity-audit-v30";
     const ACCEPTED_SCRIPT_VERSIONS = [
@@ -2689,6 +2718,60 @@
           </div>
         </div>
       `;
+    }
+
+    async function saveMonthlyTurnStatus(key, button) {
+      const turn = turns.find(item => turnRecordKey(item) === key);
+      if (!turn) {
+        showToast("No se encontró el turno seleccionado para actualizar estado.");
+        return;
+      }
+      const select = els.monthlyTurnResults.querySelector(`[data-monthly-status="${CSS.escape(key)}"]`);
+      const nextStatus = canonicalTurnStatus(select?.value || "");
+      const currentStatus = canonicalTurnStatus(turn.status);
+      if (!nextStatus) {
+        showToast("Selecciona un estado válido.");
+        return;
+      }
+      if (nextStatus === currentStatus) {
+        showToast("El turno ya tiene ese estado.");
+        return;
+      }
+      if (!canWriteSafely()) return;
+      const confirmed = window.confirm(`¿Actualizar el estado de ${turn.name} a "${nextStatus}"?`);
+      if (!confirmed) {
+        if (select) select.value = currentStatus || "Programado";
+        return;
+      }
+
+      button.disabled = true;
+      const previousText = button.textContent;
+      button.textContent = "Guardando...";
+      const payload = {
+        rowNumber: turn.rowNumber,
+        id: turn.id,
+        name: turn.name,
+        date: turn.date,
+        court: turn.court,
+        subject: turn.subject,
+        status: nextStatus,
+        notes: turn.notes || "",
+        reason: "Actualización de estado desde Turnos de Abogados",
+        deNumber: extractDeNumber(turn)
+      };
+      const saved = await updateTurnStatusInGoogleSheet(payload).catch(() => false);
+      button.disabled = false;
+      button.textContent = previousText;
+      if (!saved) {
+        showToast("No se pudo actualizar el estado en Google Sheets.");
+        if (select) select.value = currentStatus || "Programado";
+        return;
+      }
+      turns = turns.map(item => turnRecordKey(item) === key ? { ...item, status: nextStatus } : item);
+      renderAll();
+      showToast(`Estado actualizado: ${turn.name} quedó en ${nextStatus}.`);
+      syncChangeHistory({ silent: true }).catch(() => {});
+      syncFromSheet({ keepSelected: true }).catch(() => renderAll());
     }
 
     function formatRut(value) {
@@ -3068,6 +3151,15 @@
       if (key.includes("original vigente") || key.includes("vigente")) return "Original vigente";
       return raw;
     }
+
+    const TURN_STATUS_OPTIONS = [
+      "Programado",
+      "Original vigente",
+      "Turno realizado",
+      "Original reemplazado",
+      "Reemplazante vigente",
+      "Anulado"
+    ];
 
     function isReplacementStatus(status) {
       const canonical = statusKey(canonicalTurnStatus(status));
@@ -3839,6 +3931,8 @@
       if (!document.querySelector("#turnDate").value) {
         document.querySelector("#turnDate").value = nextMonthValue();
       }
+      document.querySelector("#deNumberInput").value = "";
+      prefillDeNumberFromTurnMonth();
       courtInput.focus();
       showToast("Datos del abogado cargados. Revisa tribunal, materia, mes y observaciones antes de guardar.");
     }
@@ -3850,6 +3944,8 @@
       document.querySelector("#enabledInput").value = "Sí";
       document.querySelector("#statusInput").value = "Programado";
       document.querySelector("#turnDate").value = nextMonthValue();
+      document.querySelector("#deNumberInput").value = "";
+      prefillDeNumberFromTurnMonth();
       document.querySelector("#notesInput").value = "Abogado(a) nuevo(a), sin registro de turno realizado.";
       els.newLawyerModeNote.classList.add("visible");
       document.querySelector("#subjectInput").readOnly = false;
@@ -4124,17 +4220,17 @@
       const targetDeNumber = extractDeNumber(turn);
       const targetYear = String(turn?.year || String(turn?.date || "").slice(0, 4) || "");
       const targetParts = deNumberParts(targetDeNumber, targetYear);
-      const targetVariants = deNumberVariants(targetDeNumber, targetYear);
-      if (targetVariants.length) {
+      if (targetParts.number) {
         const exactDocument = decrees.find(decree => {
           const decreeParts = deNumberParts(decreeNumberFromDocument(decree), decree?.year);
+          if (!decreeParts.number) return false;
+          if (decreeParts.number !== targetParts.number) return false;
           if (targetParts.year && decreeParts.year && targetParts.year !== decreeParts.year) return false;
-          const candidates = decreeMatchKeys(decree);
-          return targetVariants.some(target =>
-            candidates.some(candidate => candidate === target || candidate.includes(target) || target.includes(candidate))
-          );
+          if (targetParts.year && !decreeParts.year) return String(decree?.year || "") === targetParts.year;
+          return true;
         });
         if (exactDocument) return exactDocument;
+        return null;
       }
       return findDecreeByTurnPeriod(turn);
     }
@@ -4151,6 +4247,34 @@
         : `<strong>${escapeHtml(deLabel)}</strong>`;
       const designation = `Designado por ${deHtml}`;
       return notes ? `${notes}<br><span class="muted">${designation}</span>` : designation;
+    }
+
+    function turnDecreeHtml(turn) {
+      const document = findDecreeDocument(turn);
+      const deNumber = extractDeNumber(turn) || decreeNumberFromDocument(document);
+      if (!deNumber) return "Sin información";
+      const deLabel = `D.E. N° ${deNumber}`;
+      if (document?.url) {
+        return `<a href="${escapeHtml(document.url)}" target="_blank" rel="noopener">${escapeHtml(deLabel)}</a>`;
+      }
+      return `<strong>${escapeHtml(deLabel)}</strong>`;
+    }
+
+    function suggestedDeNumberForMonth(monthValue) {
+      if (!monthValue) return "";
+      const document = findDecreeByTurnPeriod({
+        date: `${monthValue}-01`,
+        year: String(monthValue).slice(0, 4)
+      });
+      return decreeNumberFromDocument(document) || "";
+    }
+
+    function prefillDeNumberFromTurnMonth() {
+      const input = document.querySelector("#deNumberInput");
+      const monthValue = document.querySelector("#turnDate")?.value || "";
+      if (!input || !monthValue || input.value.trim()) return;
+      const suggested = suggestedDeNumberForMonth(monthValue);
+      if (suggested) input.value = suggested;
     }
 
     function monthlyTurnMatchesStatus(turn, filter) {
@@ -4252,7 +4376,7 @@
                       <span class="muted">${escapeHtml(turn.month)} ${escapeHtml(turn.year)}</span>
                     </div>
                   </td>
-                  <td><div class="turn-de">${displayValue(extractDeNumber(turn))}</div></td>
+                  <td><div class="turn-de">${turnDecreeHtml(turn)}</div></td>
                   <td>
                     <div class="turn-contact">
                       <span><strong>Correo:</strong> ${displayValue(turn.email)}</span>
@@ -4262,9 +4386,15 @@
                     </div>
                   </td>
                   <td>
-                    <div class="turn-state">
+                    <div class="turn-state turn-status-editor">
                       <span class="badge ${type === "replacement" ? "gold" : statusBadgeClass(turn.status)}">${escapeHtml(canonicalTurnStatus(turn.status) || "Sin estado")}</span>
                       ${type === "excused" ? `<span class="muted">No cuenta como turno realizado</span>` : ""}
+                      <select data-monthly-status="${escapeHtml(turnRecordKey(turn))}" aria-label="Cambiar estado de ${escapeHtml(turn.name)}">
+                        ${TURN_STATUS_OPTIONS.map(status => `
+                          <option value="${escapeHtml(status)}" ${canonicalTurnStatus(turn.status) === status ? "selected" : ""}>${escapeHtml(status)}</option>
+                        `).join("")}
+                      </select>
+                      <button class="btn" type="button" data-save-monthly-status="${escapeHtml(turnRecordKey(turn))}">Guardar estado</button>
                     </div>
                   </td>
                   <td><div class="turn-note">${displayValue(turn.notes)}</div></td>
@@ -4679,6 +4809,7 @@
       document.querySelector("#courtInput").value = turn.court || "";
       document.querySelector("#statusInput").value = "Reemplazante vigente";
       document.querySelector("#enabledInput").value = "Sí";
+      document.querySelector("#deNumberInput").value = deNumber || extractDeNumber(turn) || "";
       document.querySelector("#lawyerName").value = "";
       document.querySelector("#lawyerRut").value = "";
       document.querySelector("#lawyerEmail").value = "";
@@ -5687,6 +5818,7 @@
           <div class="info-box"><span>Materia</span><strong>${escapeHtml(turn.subject)}</strong></div>
           <div class="info-box"><span>Tribunal</span><strong>${escapeHtml(turn.court)}</strong></div>
           <div class="info-box"><span>Mes</span><strong>${escapeHtml(turn.month)} ${escapeHtml(turn.year)}</strong></div>
+          <div class="info-box"><span>D.E.</span><strong>${displayValue(turn.deNumber)}</strong></div>
           <div class="info-box"><span>Estado</span><strong>${escapeHtml(canonicalTurnStatus(turn.status) || "Sin estado")}</strong></div>
           <div class="info-box"><span>Habilitado turno</span><strong>${escapeHtml(turn.active)}</strong></div>
           <div class="info-box"><span>Correo</span><strong>${displayValue(turn.email)}</strong></div>
@@ -5967,6 +6099,7 @@
       const lawyerRut = formatRut(document.querySelector("#lawyerRut").value.trim());
       const courtValue = document.querySelector("#courtInput").value.trim();
       const subjectValue = document.querySelector("#subjectInput").value.trim();
+      const typedDeNumber = document.querySelector("#deNumberInput").value.trim();
 
       if (!lawyerName) {
         showToast("Ingresa o selecciona un abogado(a) antes de guardar.");
@@ -6020,6 +6153,9 @@
       const finalNotes = turnFormMode === "new" && !normalize(formNotes).includes(normalize(newLawyerNote))
         ? [newLawyerNote, formNotes].filter(Boolean).join(" ")
         : formNotes;
+      const normalizedDeNumber = extractDeNumber({ deNumber: typedDeNumber, notes: typedDeNumber })
+        || typedDeNumber
+        || suggestedDeNumberForMonth(monthValue);
       const newTurn = {
         name: lawyerName,
         source: turnFormMode === "new" ? "Formulario web - abogado nuevo" : "Formulario web abogados de turno",
@@ -6037,7 +6173,7 @@
         status: canonicalTurnStatus(document.querySelector("#statusInput").value) || "Programado",
         active: document.querySelector("#enabledInput").value || "Sí",
         notes: finalNotes,
-        deNumber: extractDeNumber({ notes: finalNotes })
+        deNumber: normalizedDeNumber || extractDeNumber({ notes: finalNotes })
       };
       pendingTurn = newTurn;
       saveButton.disabled = false;
@@ -6168,6 +6304,11 @@
     ["input", "search", "keyup", "paste"].forEach(eventName => {
     els.monthlyTurnSearch.addEventListener(eventName, () => window.setTimeout(renderMonthlyTurns, 0));
     });
+    els.monthlyTurnResults.addEventListener("click", event => {
+      const button = event.target.closest("[data-save-monthly-status]");
+      if (!button) return;
+      saveMonthlyTurnStatus(button.dataset.saveMonthlyStatus, button);
+    });
     els.refreshDecrees.addEventListener("click", () => syncDecrees());
     els.refreshHistory.addEventListener("click", () => syncChangeHistory());
     els.openDecreeUpload.addEventListener("click", openDecreeUploadModal);
@@ -6190,6 +6331,7 @@
     document.querySelector("#lawyerRut").addEventListener("blur", event => {
       event.target.value = formatRut(event.target.value);
     });
+    document.querySelector("#turnDate").addEventListener("change", prefillDeNumberFromTurnMonth);
     document.addEventListener("click", event => {
       if (event.target.closest("[data-rut-lookup]")) {
         handleRutLookupClick(event);
