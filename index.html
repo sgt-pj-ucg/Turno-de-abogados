@@ -2447,7 +2447,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1ibluVbe3JQ9AnOoZzZCsjinJ7Mkrjxah2ONjdbGlcBVE_itH-PQnhE-aooQ_FF1z/exec";
-    const APP_VERSION = "1.9.3-decreto-match-estricto";
+    const APP_VERSION = "1.9.4-decreto-sin-adivinar";
     const DISPLAY_VERSION = "Versión N°1, 24.06.2026";
     const REQUIRED_SCRIPT_VERSION = "2026-06-25-integrity-audit-v30";
     const ACCEPTED_SCRIPT_VERSIONS = [
@@ -4237,8 +4237,9 @@
 
     function lawyerTurnObservationHtml(turn) {
       const notes = hasData(turn.notes) ? escapeHtml(turn.notes) : "";
-      const document = findDecreeDocument(turn);
-      const deNumber = extractDeNumber(turn) || decreeNumberFromDocument(document);
+      const explicitDeNumber = extractDeNumber(turn);
+      const document = explicitDeNumber ? findDecreeDocument(turn) : null;
+      const deNumber = explicitDeNumber;
       if (!deNumber) return notes || "Sin información";
 
       const deLabel = `D.E. N° ${deNumber}`;
@@ -4250,8 +4251,8 @@
     }
 
     function turnDecreeHtml(turn) {
-      const document = findDecreeDocument(turn);
-      const deNumber = extractDeNumber(turn) || decreeNumberFromDocument(document);
+      const deNumber = extractDeNumber(turn);
+      const document = deNumber ? findDecreeDocument(turn) : null;
       if (!deNumber) return "Sin información";
       const deLabel = `D.E. N° ${deNumber}`;
       if (document?.url) {
