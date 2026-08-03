@@ -3336,6 +3336,15 @@
       return true;
     }
 
+    function countsAsRegisteredTurn(status) {
+      const key = statusKey(canonicalTurnStatus(status));
+      if (!key) return true;
+      if (key.includes("original reemplaz")) return false;
+      if (key.includes("excus")) return false;
+      if (key.includes("anulad")) return false;
+      return true;
+    }
+
     function isExcuseOrReplacementStatus(status) {
       return isExcusedOriginalStatus(status);
     }
@@ -3440,6 +3449,7 @@
       return [...profiles.values()].map(profile => {
         profile.turns.sort((a, b) => parseDate(b.date) - parseDate(a.date));
         profile.newLawyerRecords.sort((a, b) => parseDate(b.createdAt) - parseDate(a.createdAt));
+        profile.registeredTurns = profile.turns.filter(turn => countsAsRegisteredTurn(turn.status));
         profile.performedTurns = profile.turns.filter(turn => countsAsPerformedTurn(turn.status));
         const latestNewLawyer = profile.newLawyerRecords[0] || null;
         profile.name = profile.turns[0]?.name || latestNewLawyer?.name || profile.name;
@@ -3447,12 +3457,14 @@
         profile.address = profile.turns[0]?.address || latestNewLawyer?.address || profile.address;
         profile.phone = profile.turns[0]?.phone || latestNewLawyer?.phone || profile.phone;
         profile.email = profile.turns[0]?.email || latestNewLawyer?.email || profile.email;
-        profile.subjects = uniqueValues(profile.performedTurns, "subject");
-        profile.courts = uniqueValues(profile.performedTurns, "court");
+        profile.subjects = uniqueValues(profile.registeredTurns, "subject");
+        profile.courts = uniqueValues(profile.registeredTurns, "court");
         profile.lastRecordedTurn = profile.turns[0];
-        profile.lastTurn = profile.performedTurns[0] || null;
+        profile.lastTurn = profile.registeredTurns[0] || null;
+        profile.lastPerformedTurn = profile.performedTurns[0] || null;
         profile.excuseRecords = profile.turns.filter(turn => isExcuseOrReplacementStatus(turn.status));
         profile.turnsTotal = profile.performedTurns.length;
+        profile.registeredTurnsTotal = profile.registeredTurns.length;
         profile.recordsTotal = profile.turns.length;
         profile.latestNewLawyerRecord = latestNewLawyer;
         profile.isNewBaseLawyer = Boolean(latestNewLawyer && !profile.lastTurn);
@@ -3501,7 +3513,7 @@
 
     function topSubjects(profile) {
       const counts = new Map();
-      (profile.performedTurns || []).forEach(turn => counts.set(turn.subject, (counts.get(turn.subject) || 0) + 1));
+      (profile.registeredTurns || []).forEach(turn => counts.set(turn.subject, (counts.get(turn.subject) || 0) + 1));
       return [...counts.entries()]
         .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0], "es"))
         .map(([subject]) => subject)
@@ -3581,7 +3593,7 @@
           <strong>${escapeHtml(profile.name)}</strong>
           <span class="muted">RUT: ${escapeHtml(profile.rut ? formatRut(profile.rut) : "Sin RUT registrado")}</span>
           <span class="muted">${escapeHtml(profile.email || profile.phone || "Sin contacto registrado")}</span>
-          <span class="muted">${profile.isNewBaseLawyer ? "Abogado(a) nuevo(a), sin turno realizado" : `${profile.turnsTotal} turno${profile.turnsTotal === 1 ? "" : "s"} realizado${profile.turnsTotal === 1 ? "" : "s"} · Último realizado: ${profile.lastTurn ? escapeHtml(profile.lastTurn.month + " " + profile.lastTurn.year) : "Sin registro"}`}</span>
+          <span class="muted">${profile.isNewBaseLawyer ? "Abogado(a) nuevo(a), sin turno registrado" : `${profile.registeredTurnsTotal} turno${profile.registeredTurnsTotal === 1 ? "" : "s"} registrado${profile.registeredTurnsTotal === 1 ? "" : "s"} · Último turno: ${profile.lastTurn ? escapeHtml(profile.lastTurn.month + " " + profile.lastTurn.year) : "Sin registro"}${profile.turnsTotal ? ` · ${profile.turnsTotal} realizado${profile.turnsTotal === 1 ? "" : "s"}` : ""}`}</span>
         </button>
       `).join("");
     }
@@ -3609,18 +3621,19 @@
       }
       els.selectedBadge.textContent = profile.isNewBaseLawyer
         ? "Abogado(a) nuevo(a)"
-        : `${profile.turnsTotal} turnos realizados`;
+        : `${profile.registeredTurnsTotal} turno${profile.registeredTurnsTotal === 1 ? "" : "s"} registrado${profile.registeredTurnsTotal === 1 ? "" : "s"}`;
       els.lawyerDetail.className = "profile";
       const specialties = topSubjects(profile);
       const missingIssues = contactIssues(profile);
       const historyTurns = sortedHistory(profile.turns);
-      const lastTurnText = profile.lastTurn ? escapeHtml(profile.lastTurn.month + " " + profile.lastTurn.year) : "Sin turno realizado";
+      const lastTurnText = profile.lastTurn ? escapeHtml(profile.lastTurn.month + " " + profile.lastTurn.year) : "Sin turno registrado";
+      const lastTurnStatus = profile.lastTurn?.status ? ` · ${escapeHtml(canonicalTurnStatus(profile.lastTurn.status))}` : "";
       const monthsText = monthsSummary(profile);
       els.lawyerDetail.innerHTML = `
         <div class="profile-head">
           <div>
             <h3>${escapeHtml(profile.name)}</h3>
-            <p class="muted">${monthsText} · Último turno realizado: ${lastTurnText}</p>
+            <p class="muted">${monthsText} · Último turno: ${lastTurnText}${lastTurnStatus}</p>
             ${profile.isNewBaseLawyer ? `<span class="badge blue">Base Abogados nuevos · sin turno histórico</span>` : ""}
           </div>
           <div class="status-control">
@@ -3681,6 +3694,7 @@
         <div class="summary-grid">
           <div class="info-box"><span>Materias históricas</span><div class="chips">${profile.subjects.map(item => `<span class="badge gold">${escapeHtml(item)}</span>`).join("")}</div></div>
           <div class="info-box"><span>Tribunales</span><strong>${escapeHtml(profile.courts.length)} registrados</strong></div>
+          <div class="info-box"><span>Turnos registrados</span><strong>${profile.registeredTurnsTotal}</strong></div>
           <div class="info-box"><span>Turnos realizados</span><strong>${profile.turnsTotal}</strong></div>
         </div>
         <div class="table-wrap">
@@ -3994,7 +4008,7 @@
             : "abogado(a) nuevo(a), sin registro de turno realizado"];
       if (subject && profile.subjects.includes(subject)) reasons.push(`ha trabajado materia ${subject}`);
       if (court && profile.courts.includes(court)) reasons.push(`registra turnos en ${court}`);
-      if (profile.turnsTotal > 1) reasons.push(`${profile.turnsTotal} turnos realizados, con penalización por repetición`);
+      if (profile.registeredTurnsTotal > 1) reasons.push(`${profile.registeredTurnsTotal} turnos registrados, con penalización por repetición`);
       return reasons.join("; ");
     }
 
@@ -4007,7 +4021,7 @@
         const specialties = topSubjects(profile);
         const subjectAffinity = subject && profile.subjects.includes(subject) ? 8 : 0;
         const courtAffinity = court && profile.courts.includes(court) ? 4 : 0;
-        const repeatPenalty = Math.max(0, profile.turnsTotal - 1) * 2;
+        const repeatPenalty = Math.max(0, profile.registeredTurnsTotal - 1) * 2;
         const newLawyerPriority = profile.isNewBaseLawyer ? 10000 : 0;
         const score = newLawyerPriority + profile.rankingMonths * 3 + subjectAffinity + courtAffinity - repeatPenalty;
         return { ...profile, specialties, score };
@@ -4021,7 +4035,7 @@
 
       const candidates = (ranked.length || rankingText) ? ranked : activeProfiles.map(profile => {
         const specialties = topSubjects(profile);
-        const repeatPenalty = Math.max(0, profile.turnsTotal - 1) * 2;
+        const repeatPenalty = Math.max(0, profile.registeredTurnsTotal - 1) * 2;
         const newLawyerPriority = profile.isNewBaseLawyer ? 10000 : 0;
         return { ...profile, specialties, score: newLawyerPriority + profile.rankingMonths * 3 - repeatPenalty };
       }).filter(profile => profile.rankingMonths >= rankingMinMonths)
