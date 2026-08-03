@@ -4694,54 +4694,118 @@
       return compactSpaces(value)
         .replace(/^[\s:;.,\->–•➢]+/g, "")
         .replace(/^\d+\s*[).-]\s*/g, "")
-        .replace(/^(don|doña|dona|sr\.?|sra\.?)\s+/i, "")
+        .replace(/^(don\s*\(\s*ña\s*\)|don\s*\(\s*a\s*\)|don|doña|dona|sr\.?|sra\.?)\s+/i, "")
         .replace(/[,:;.-]+$/g, "")
         .trim();
     }
 
-    function parseDecreeRoster(text, { year, month, deNumber }) {
-      const fullText = String(text || "");
-      const courtPattern = /(Primer\s+Juzgado\s+de\s+Letras|Segundo\s+Juzgado\s+de\s+Letras|Tercer\s+Juzgado\s+de\s+Letras|Juzgado\s+de\s+Familia|Causas\s+Criminales\s*\(antiguo\)|Causas\s+criminales\s*\(antiguo\)|Juzgado\s+de\s+Letras\s+del\s+Trabajo|Segunda\s+Instancia\s+y\s+Fiscal[ií]a\s+Militar)\s*:/gi;
-      const matches = [...fullText.matchAll(courtPattern)];
+    function cleanDecreeTextForRoster(text) {
+      let cleaned = String(text || "")
+        .replace(/---PAGE\s+\d+---/gi, "\n")
+        .replace(/Este documento tiene firma electrónica[\s\S]*?Código:\s*[A-Z0-9]+/gi, "\n")
+        .replace(/\uF0D8/g, "➢");
+      cleaned = cleaned.replace(/^[\s\S]*?1\.-\s*TURNO\s+ABOGADOS\s*:?\s*/i, "\n");
+      cleaned = cleaned.replace(/\n\s*2\.-\s*TURNO\s+NOTAR[IÍ]AS[\s\S]*$/i, "\n");
+      cleaned = cleaned.replace(/\n\s*3\.-\s*RECEPTORES[\s\S]*$/i, "\n");
+      return cleaned;
+    }
+
+    function subjectAndCourtFromDecreeHeading(line, current) {
+      const normalizedLine = normalize(line);
+      if (/causas\s+civiles/.test(normalizedLine)) {
+        return { subject: "Civil", court: "" };
+      }
+      if (/causas\s+del\s+juzgado\s+de\s+familia|juzgado\s+de\s+familia/.test(normalizedLine)) {
+        return { subject: "Familia", court: "Juzgado de Familia" };
+      }
+      if (/causas\s+juzgado\s+de\s+letras\s+del\s+trabajo|juzgado\s+de\s+letras\s+del\s+trabajo/.test(normalizedLine)) {
+        return { subject: "Trabajo", court: "Juzgado de Letras del Trabajo" };
+      }
+      if (/causas\s+criminales/.test(normalizedLine)) {
+        return { subject: "Criminal antiguo", court: "Causas criminales (antiguo)" };
+      }
+      if (/segunda\s+instancia\s+y\s+fiscalia\s+militar/.test(normalizedLine)) {
+        return { subject: "Segunda instancia y Fiscalía Militar", court: "Segunda instancia y Fiscalía Militar" };
+      }
+      return current;
+    }
+
+    function courtFromDecreeEntry(entry, defaultCourt) {
+      const match = compactSpaces(entry).match(/(Primer\s+Juzgado\s+de\s+Letras|Segundo\s+Juzgado\s+de\s+Letras|Tercer\s+Juzgado\s+de\s+Letras|Juzgado\s+de\s+Familia|Juzgado\s+de\s+Letras\s+del\s+Trabajo|Causas\s+Criminales\s*\(antiguo\)|Segunda\s+Instancia\s+y\s+Fiscal[ií]a\s+Militar)\s*:/i);
+      return canonicalCourtName(match?.[1] || defaultCourt || "");
+    }
+
+    function parseDecreeRosterEntry(entry, context, { year, month, deNumber }) {
       const period = `${year}-${String(month).padStart(2, "0")}`;
       const monthLabel = monthNameFromCode(month);
+      const segmentOneLine = compactSpaces(entry)
+        .replace(/^(?:[➢•-]\s*)/g, "")
+        .replace(/^(Primer\s+Juzgado\s+de\s+Letras|Segundo\s+Juzgado\s+de\s+Letras|Tercer\s+Juzgado\s+de\s+Letras|Juzgado\s+de\s+Familia|Juzgado\s+de\s+Letras\s+del\s+Trabajo|Causas\s+Criminales\s*\(antiguo\)|Segunda\s+Instancia\s+y\s+Fiscal[ií]a\s+Militar)\s*:\s*/i, "");
+      const namePart = segmentOneLine.split(/domiciliad[oa]\s+en|domicilio|tel\.?|fono|cel(?:ular)?\.?|email|correo/i)[0];
+      const name = cleanDecreeLawyerName(namePart);
+      const normalizedName = normalize(name);
+      if (!name || name.length < 6 || !/\b[a-záéíóúñ]{3,}\b\s+\b[a-záéíóúñ]{3,}\b/i.test(name)) return null;
+      if (/causas|turno|juzgado|decreto|documento|firma|codigo|validado|verificadoc|notaria|notario|procurador|receptor/.test(normalizedName)) return null;
+
+      const email = segmentOneLine.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || "";
+      const phoneMatch = segmentOneLine.match(/(?:tel\.?|fono|cel(?:ular)?\.?)\s*[:.]?\s*([+0-9\s().-]{7,24})/i);
+      const phone = phoneMatch ? compactSpaces(phoneMatch[1]).replace(/[^\d+\s-]/g, "").trim() : "";
+      const addressMatch = segmentOneLine.match(/domiciliad[oa]\s+en\s+(.+?)(?=,\s*(?:tel\.?|fono|cel(?:ular)?\.?|email|correo)\b|\s+(?:tel\.?|fono|cel(?:ular)?\.?|email|correo)\b|$)/i);
+      const address = addressMatch ? compactSpaces(addressMatch[1]).replace(/[,:;.-]+$/g, "") : "";
+      const subject = canonicalSubjectName(context.subject || subjectFromDecreeContext(entry));
+      const court = courtFromDecreeEntry(entry, context.court);
+
+      return {
+        name,
+        rut: "",
+        email,
+        phone,
+        address,
+        court,
+        subject,
+        date: `${period}-01`,
+        year,
+        month: monthLabel,
+        status: "Programado",
+        active: "Sí",
+        deNumber,
+        notes: `Designado por D.E. N° ${deNumber}. Importado desde decreto económico.`
+      };
+    }
+
+    function parseDecreeRoster(text, { year, month, deNumber }) {
+      const fullText = cleanDecreeTextForRoster(text);
+      const lines = fullText.split(/\n+/).map(compactSpaces).filter(Boolean);
       const rows = [];
+      let context = { subject: "", court: "" };
+      let currentEntry = "";
 
-      matches.forEach((match, index) => {
-        const courtRaw = compactSpaces(match[1]);
-        const start = match.index + match[0].length;
-        const end = matches[index + 1]?.index ?? fullText.length;
-        const segment = fullText.slice(start, end);
-        const segmentOneLine = compactSpaces(segment);
-        const namePart = segmentOneLine.split(/domiciliad[oa]\s+en|domicilio|tel\.?|fono|cel(?:ular)?\.?|email|correo/i)[0];
-        const name = cleanDecreeLawyerName(namePart);
-        if (!name || name.length < 6 || /causas|turno|juzgado|decreto/i.test(name)) return;
+      const flushEntry = () => {
+        if (!currentEntry) return;
+        const row = parseDecreeRosterEntry(currentEntry, context, { year, month, deNumber });
+        if (row) rows.push(row);
+        currentEntry = "";
+      };
 
-        const email = segmentOneLine.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || "";
-        const phoneMatch = segmentOneLine.match(/(?:tel\.?|fono|cel(?:ular)?\.?)\s*[:.]?\s*([+0-9\s().-]{7,24})/i);
-        const phone = phoneMatch ? compactSpaces(phoneMatch[1]).replace(/[^\d+\s-]/g, "").trim() : "";
-        const addressMatch = segmentOneLine.match(/domiciliad[oa]\s+en\s+(.+?)(?=,\s*(?:tel\.?|fono|cel(?:ular)?\.?|email|correo)\b|\s+(?:tel\.?|fono|cel(?:ular)?\.?|email|correo)\b|$)/i);
-        const address = addressMatch ? compactSpaces(addressMatch[1]).replace(/[,:;.-]+$/g, "") : "";
-        const context = fullText.slice(Math.max(0, match.index - 900), match.index);
-        const subject = canonicalSubjectName(subjectFromDecreeContext(context));
-        const court = canonicalCourtName(courtRaw);
-        rows.push({
-          name,
-          rut: "",
-          email,
-          phone,
-          address,
-          court,
-          subject,
-          date: `${period}-01`,
-          year,
-          month: monthLabel,
-          status: "Programado",
-          active: "Sí",
-          deNumber,
-          notes: `Designado por D.E. N° ${deNumber}. Importado desde decreto económico.`
-        });
+      lines.forEach(line => {
+        if (/^\d+\.-\s*(turno\s+notar|receptores|procurador)/i.test(line)) {
+          flushEntry();
+          return;
+        }
+        if (/^causas\b/i.test(line)) {
+          flushEntry();
+          context = subjectAndCourtFromDecreeHeading(line, context);
+          return;
+        }
+        const startsEntry = /^[➢•-]\s*/.test(line) || /^(Primer|Segundo|Tercer)\s+Juzgado\s+de\s+Letras\s*:/i.test(line);
+        if (startsEntry) {
+          flushEntry();
+          currentEntry = line;
+          return;
+        }
+        if (currentEntry) currentEntry += " " + line;
       });
+      flushEntry();
 
       const seen = new Set();
       return rows.filter(row => {
