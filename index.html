@@ -2593,11 +2593,13 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1ibluVbe3JQ9AnOoZzZCsjinJ7Mkrjxah2ONjdbGlcBVE_itH-PQnhE-aooQ_FF1z/exec";
-    const APP_VERSION = "1.9.8-importacion-decreto-domicilios";
+    const APP_VERSION = "1.9.9-importacion-turnos-confirmada";
     const DISPLAY_VERSION = "Versión N°1, 24.06.2026";
-    const REQUIRED_SCRIPT_VERSION = "2026-07-14-newlawyer-enabled-v31";
+    // The public deployment currently exposes v30. It already includes the
+    // authenticated append action used by the decree roster import.
+    const REQUIRED_SCRIPT_VERSION = "2026-06-25-integrity-audit-v30";
     const ACCEPTED_SCRIPT_VERSIONS = [
-      "2026-07-14-newlawyer-enabled-v31"
+      "2026-06-25-integrity-audit-v30"
     ];
     const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
@@ -5032,19 +5034,21 @@
 
     async function importSelectedDecreeRosterTurns() {
       const selectedTurns = selectedDecreeRosterTurns();
-      if (!selectedTurns.length) return { saved: 0, failed: 0, skipped: detectedDecreeRoster.length };
+      if (!selectedTurns.length) return { saved: 0, failed: 0, skipped: detectedDecreeRoster.length, errors: [] };
       let saved = 0;
       let failed = 0;
+      const errors = [];
       for (const turn of selectedTurns) {
-        const ok = await saveTurnToGoogleSheet(turn).catch(() => false);
-        if (ok) {
+        const result = await saveTurnToGoogleSheet(turn).catch(error => ({ ok: false, message: error?.message || "Error de comunicación." }));
+        if (result.ok) {
           saved += 1;
           turns.push(turn);
         } else {
           failed += 1;
+          errors.push(`${turn.name}: ${result.message || "No se pudo guardar."}`);
         }
       }
-      return { saved, failed, skipped: detectedDecreeRoster.length - selectedTurns.length };
+      return { saved, failed, skipped: detectedDecreeRoster.length - selectedTurns.length, errors };
     }
 
     function setDecreeUploadStatus(message, kind = "info") {
@@ -5110,6 +5114,31 @@
         if (els.decreeImportCheckbox?.checked && !detectedDecreeRoster.length) {
           await analyzeDecreeRosterFromForm();
         }
+        const expectedDecree = normalize(deNumber);
+        const existingDecree = decrees.find(decree =>
+          normalize([decree.deNumber, decree.name].join(" ")).includes(expectedDecree)
+          && String(decree.year || "") === String(year)
+        );
+        const selectedExistingRoster = Boolean(els.decreeImportCheckbox?.checked && selectedDecreeRosterTurns().length);
+
+        // A previous attempt can have stored the PDF while leaving its roster
+        // pending. Import it now without creating a duplicate Drive document.
+        if (existingDecree && selectedExistingRoster) {
+          setDecreeUploadStatus("<strong>Decreto ya disponible.</strong> Importando los turnos seleccionados a la base histórica sin volver a subir el PDF.", "info");
+          const result = await importSelectedDecreeRosterTurns();
+          await syncFromSheet({ keepSelected: true }).catch(() => renderAll());
+          const detail = result.failed
+            ? `<br><strong>Detalle:</strong> ${escapeHtml(result.errors.join(" | "))}`
+            : "";
+          setDecreeUploadStatus(
+            `<strong>Proceso finalizado.</strong> Importación realizada: ${result.saved} turno(s) guardado(s)${result.failed ? `, ${result.failed} con error` : ""}${result.skipped ? `, ${result.skipped} omitido(s)` : ""}.${detail}`,
+            result.failed ? "error" : "success"
+          );
+          populateDecreeUploadOptions();
+          els.uploadDecreeButton.disabled = false;
+          els.uploadDecreeButton.textContent = "Subir decreto económico";
+          return;
+        }
         const filePayload = await readFilePayload(file);
         const payload = {
           year,
@@ -5133,8 +5162,11 @@
               setDecreeUploadStatus("<strong>Decreto cargado.</strong> Importando los turnos seleccionados a la base histórica.", "info");
               const result = await importSelectedDecreeRosterTurns();
               await syncFromSheet({ keepSelected: true }).catch(() => renderAll());
+              const detail = result.failed
+                ? `<br><strong>Detalle:</strong> ${escapeHtml(result.errors.join(" | "))}`
+                : "";
               setDecreeUploadStatus(
-                `<strong>Proceso finalizado.</strong> Decreto disponible e importación realizada: ${result.saved} turno(s) guardado(s)${result.failed ? `, ${result.failed} con error` : ""}${result.skipped ? `, ${result.skipped} omitido(s)` : ""}.`,
+                `<strong>Proceso finalizado.</strong> Decreto disponible e importación realizada: ${result.saved} turno(s) guardado(s)${result.failed ? `, ${result.failed} con error` : ""}${result.skipped ? `, ${result.skipped} omitido(s)` : ""}.${detail}`,
                 result.failed ? "error" : "success"
               );
               populateDecreeUploadOptions();
@@ -5879,14 +5911,14 @@
     }
 
     function saveTurnToGoogleSheet(turn) {
-      if (!GOOGLE_APPS_SCRIPT_URL) return Promise.resolve(false);
+      if (!GOOGLE_APPS_SCRIPT_URL) return Promise.resolve({ ok: false, message: "No hay Apps Script configurado." });
       const payload = { ...turn, actorToken: currentSessionToken() };
       return new Promise(resolve => {
         const callbackName = `turnSave_${Date.now()}_${Math.round(Math.random() * 100000)}`;
         const script = document.createElement("script");
         const timer = window.setTimeout(() => {
           cleanup();
-          resolve(false);
+          resolve({ ok: false, message: "Apps Script no respondió al guardar el turno." });
         }, 12000);
 
         function cleanup() {
@@ -5895,14 +5927,17 @@
           delete window[callbackName];
         }
 
-        window[callbackName] = payload => {
+        window[callbackName] = response => {
           cleanup();
-          resolve(Boolean(payload && payload.ok));
+          resolve({
+            ok: Boolean(response && response.ok),
+            message: response?.message || (response?.ok ? "Turno guardado" : "Apps Script rechazó el turno.")
+          });
         };
 
         script.onerror = () => {
           cleanup();
-          resolve(false);
+          resolve({ ok: false, message: "No fue posible conectar con Apps Script." });
         };
 
         const params = new URLSearchParams({
