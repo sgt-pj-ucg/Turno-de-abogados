@@ -506,6 +506,81 @@
       width: 100%;
     }
 
+    .decree-import-box {
+      border: 1px solid #dce3ee;
+      border-radius: 8px;
+      padding: 14px;
+      background: #f8fafc;
+      display: grid;
+      gap: 12px;
+    }
+
+    .decree-import-toolbar {
+      display: flex;
+      gap: 10px;
+      justify-content: space-between;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .decree-import-toggle {
+      display: inline-flex;
+      gap: 10px;
+      align-items: flex-start;
+      color: var(--muted);
+      line-height: 1.35;
+    }
+
+    .decree-import-toggle input {
+      width: 18px;
+      height: 18px;
+      margin-top: 2px;
+      accent-color: var(--navy);
+    }
+
+    .decree-import-preview {
+      display: none;
+      gap: 8px;
+    }
+
+    .decree-import-preview.visible {
+      display: grid;
+    }
+
+    .decree-import-row {
+      border: 1px solid #dce3ee;
+      border-radius: 8px;
+      padding: 10px;
+      background: #fff;
+      display: grid;
+      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) auto;
+      gap: 10px;
+      align-items: center;
+    }
+
+    .decree-import-row.duplicate {
+      background: #fff8ec;
+      border-color: #ead8ae;
+    }
+
+    .decree-import-row strong {
+      display: block;
+      color: var(--ink);
+    }
+
+    .decree-import-row span {
+      display: block;
+      color: var(--muted);
+      font-size: .9rem;
+      line-height: 1.35;
+    }
+
+    .decree-import-row input[type="checkbox"] {
+      width: 18px;
+      height: 18px;
+      accent-color: var(--navy);
+    }
+
     .decree-panel-header {
       gap: 14px;
     }
@@ -1707,7 +1782,7 @@
       .actions { justify-content: stretch; }
       .actions .btn { flex: 1; }
       .contact-toolbar { align-items: flex-start; flex-direction: column; }
-      .metrics, .contact-grid, .summary-grid, .form-grid, .turn-meta-grid, .rank-controls, .alert-grid, .alert-edit-grid, .document-row, .period-picker, .new-lawyer-main-fields, .new-lawyer-contact-fields, .new-lawyer-detail-fields, .new-lawyer-actions, .decree-upload-grid, .decree-upload-actions, .alert-contact-grid, .manual-grid { grid-template-columns: 1fr; }
+      .metrics, .contact-grid, .summary-grid, .form-grid, .turn-meta-grid, .rank-controls, .alert-grid, .alert-edit-grid, .document-row, .period-picker, .new-lawyer-main-fields, .new-lawyer-contact-fields, .new-lawyer-detail-fields, .new-lawyer-actions, .decree-upload-grid, .decree-upload-actions, .decree-import-row, .alert-contact-grid, .manual-grid { grid-template-columns: 1fr; }
       .rank-search { grid-column: span 1; }
       .alert-address-field,
       .alert-save-cell { grid-column: auto; }
@@ -2397,6 +2472,16 @@
             <p>Formato sugerido: <strong>04. D.E. N°159-2026.pdf</strong>. El mes permite ordenar los documentos del 01 al 12.</p>
             <div class="last-save" id="decreeUploadStatus"></div>
           </div>
+          <div class="decree-import-box">
+            <div class="decree-import-toolbar">
+              <label class="decree-import-toggle" for="decreeImportCheckbox">
+                <input id="decreeImportCheckbox" type="checkbox">
+                <span><strong>Actualizar turnos desde este decreto</strong><br>La aplicación intentará leer los abogados del PDF, mostrará una previsualización y solo guardará los registros seleccionados.</span>
+              </label>
+              <button class="btn compact" id="analyzeDecreeRoster" type="button">Analizar nómina del PDF</button>
+            </div>
+            <div class="decree-import-preview" id="decreeImportPreview"></div>
+          </div>
         </form>
       </div>
       <div class="modal-actions">
@@ -2447,11 +2532,11 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1ibluVbe3JQ9AnOoZzZCsjinJ7Mkrjxah2ONjdbGlcBVE_itH-PQnhE-aooQ_FF1z/exec";
-    const APP_VERSION = "1.9.4-decreto-sin-adivinar";
+    const APP_VERSION = "1.9.6-importacion-decreto-turno";
     const DISPLAY_VERSION = "Versión N°1, 24.06.2026";
-    const REQUIRED_SCRIPT_VERSION = "2026-06-25-integrity-audit-v30";
+    const REQUIRED_SCRIPT_VERSION = "2026-07-14-newlawyer-enabled-v31";
     const ACCEPTED_SCRIPT_VERSIONS = [
-      "2026-06-25-integrity-audit-v30"
+      "2026-07-14-newlawyer-enabled-v31"
     ];
     const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
@@ -2472,6 +2557,8 @@
     let changeHistory = [];
     let historyLoadError = "";
     let editingNewBaseLawyerRowNumber = null;
+    let detectedDecreeRoster = [];
+    let pdfJsLoadPromise = null;
     let selectedLawyerKey = "";
     let rankingMinMonths = 0;
     let pendingTurn = null;
@@ -2550,6 +2637,9 @@
       decreeUploadMonth: document.querySelector("#decreeUploadMonth"),
       decreeUploadNumber: document.querySelector("#decreeUploadNumber"),
       decreeUploadFile: document.querySelector("#decreeUploadFile"),
+      decreeImportCheckbox: document.querySelector("#decreeImportCheckbox"),
+      analyzeDecreeRoster: document.querySelector("#analyzeDecreeRoster"),
+      decreeImportPreview: document.querySelector("#decreeImportPreview"),
       uploadDecreeButton: document.querySelector("#uploadDecreeButton"),
       cancelDecreeUpload: document.querySelector("#cancelDecreeUpload"),
       decreeUploadStatus: document.querySelector("#decreeUploadStatus"),
@@ -4516,6 +4606,265 @@
       els.decreeUploadMonth.value = selectedMonth;
     }
 
+    function monthNameFromCode(code) {
+      return MONTH_OPTIONS.find(([value]) => value === String(code).padStart(2, "0"))?.[1] || "";
+    }
+
+    function resetDecreeImportPreview() {
+      detectedDecreeRoster = [];
+      if (els.decreeImportCheckbox) els.decreeImportCheckbox.checked = false;
+      if (els.decreeImportPreview) {
+        els.decreeImportPreview.classList.remove("visible");
+        els.decreeImportPreview.innerHTML = "";
+      }
+    }
+
+    function ensurePdfJs() {
+      if (window.pdfjsLib) return Promise.resolve(window.pdfjsLib);
+      if (pdfJsLoadPromise) return pdfJsLoadPromise;
+      pdfJsLoadPromise = new Promise((resolve, reject) => {
+        const script = document.createElement("script");
+        script.src = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js";
+        script.onload = () => {
+          if (!window.pdfjsLib) {
+            reject(new Error("No se pudo iniciar el lector PDF."));
+            return;
+          }
+          window.pdfjsLib.GlobalWorkerOptions.workerSrc = "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+          resolve(window.pdfjsLib);
+        };
+        script.onerror = () => reject(new Error("No se pudo cargar el lector PDF. Revisa conexión a internet."));
+        document.head.appendChild(script);
+      });
+      return pdfJsLoadPromise;
+    }
+
+    async function extractPdfText(file) {
+      const pdfjs = await ensurePdfJs();
+      const data = new Uint8Array(await file.arrayBuffer());
+      const pdf = await pdfjs.getDocument({ data }).promise;
+      const pages = [];
+      for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber += 1) {
+        const page = await pdf.getPage(pageNumber);
+        const content = await page.getTextContent();
+        const grouped = new Map();
+        content.items.forEach(item => {
+          const y = Math.round(item.transform[5]);
+          if (!grouped.has(y)) grouped.set(y, []);
+          grouped.get(y).push({ text: item.str, x: item.transform[4] });
+        });
+        const lines = [...grouped.entries()]
+          .sort((a, b) => b[0] - a[0])
+          .map(([, items]) => items.sort((a, b) => a.x - b.x).map(item => item.text).join(" ").trim())
+          .filter(Boolean);
+        pages.push(lines.join("\n"));
+      }
+      return pages.join("\n");
+    }
+
+    function compactSpaces(value) {
+      return String(value || "").replace(/\s+/g, " ").trim();
+    }
+
+    function subjectFromDecreeContext(context) {
+      const normalizedContext = normalize(context);
+      const subjectRules = [
+        [/causas\s+del\s+juzgado\s+de\s+familia|familia/g, "Familia"],
+        [/causas\s+criminales|criminal\s+antiguo|criminales\s*\(antiguo\)/g, "Criminal antiguo"],
+        [/juzgado\s+de\s+letras\s+del\s+trabajo|causas\s+del\s+trabajo|trabajo/g, "Trabajo"],
+        [/segunda\s+instancia\s+y\s+fiscalia\s+militar|fiscalia\s+militar/g, "Segunda instancia y Fiscalía Militar"],
+        [/causas\s+civiles|civil/g, "Civil"]
+      ];
+      let selected = "";
+      let selectedIndex = -1;
+      subjectRules.forEach(([pattern, subject]) => {
+        pattern.lastIndex = 0;
+        let match;
+        while ((match = pattern.exec(normalizedContext)) !== null) {
+          if (match.index >= selectedIndex) {
+            selectedIndex = match.index;
+            selected = subject;
+          }
+        }
+      });
+      return selected || "Sin materia";
+    }
+
+    function cleanDecreeLawyerName(value) {
+      return compactSpaces(value)
+        .replace(/^[\s:;.,\->–•➢]+/g, "")
+        .replace(/^\d+\s*[).-]\s*/g, "")
+        .replace(/^(don|doña|dona|sr\.?|sra\.?)\s+/i, "")
+        .replace(/[,:;.-]+$/g, "")
+        .trim();
+    }
+
+    function parseDecreeRoster(text, { year, month, deNumber }) {
+      const fullText = String(text || "");
+      const courtPattern = /(Primer\s+Juzgado\s+de\s+Letras|Segundo\s+Juzgado\s+de\s+Letras|Tercer\s+Juzgado\s+de\s+Letras|Juzgado\s+de\s+Familia|Causas\s+Criminales\s*\(antiguo\)|Causas\s+criminales\s*\(antiguo\)|Juzgado\s+de\s+Letras\s+del\s+Trabajo|Segunda\s+Instancia\s+y\s+Fiscal[ií]a\s+Militar)\s*:/gi;
+      const matches = [...fullText.matchAll(courtPattern)];
+      const period = `${year}-${String(month).padStart(2, "0")}`;
+      const monthLabel = monthNameFromCode(month);
+      const rows = [];
+
+      matches.forEach((match, index) => {
+        const courtRaw = compactSpaces(match[1]);
+        const start = match.index + match[0].length;
+        const end = matches[index + 1]?.index ?? fullText.length;
+        const segment = fullText.slice(start, end);
+        const segmentOneLine = compactSpaces(segment);
+        const namePart = segmentOneLine.split(/domiciliad[oa]\s+en|domicilio|tel\.?|fono|cel(?:ular)?\.?|email|correo/i)[0];
+        const name = cleanDecreeLawyerName(namePart);
+        if (!name || name.length < 6 || /causas|turno|juzgado|decreto/i.test(name)) return;
+
+        const email = segmentOneLine.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || "";
+        const phoneMatch = segmentOneLine.match(/(?:tel\.?|fono|cel(?:ular)?\.?)\s*[:.]?\s*([+0-9\s().-]{7,24})/i);
+        const phone = phoneMatch ? compactSpaces(phoneMatch[1]).replace(/[^\d+\s-]/g, "").trim() : "";
+        const addressMatch = segmentOneLine.match(/domiciliad[oa]\s+en\s+(.+?)(?=,\s*(?:tel\.?|fono|cel(?:ular)?\.?|email|correo)\b|\s+(?:tel\.?|fono|cel(?:ular)?\.?|email|correo)\b|$)/i);
+        const address = addressMatch ? compactSpaces(addressMatch[1]).replace(/[,:;.-]+$/g, "") : "";
+        const context = fullText.slice(Math.max(0, match.index - 900), match.index);
+        const subject = canonicalSubjectName(subjectFromDecreeContext(context));
+        const court = canonicalCourtName(courtRaw);
+        rows.push({
+          name,
+          rut: "",
+          email,
+          phone,
+          address,
+          court,
+          subject,
+          date: `${period}-01`,
+          year,
+          month: monthLabel,
+          status: "Programado",
+          active: "Sí",
+          deNumber,
+          notes: `Designado por D.E. N° ${deNumber}. Importado desde decreto económico.`
+        });
+      });
+
+      const seen = new Set();
+      return rows.filter(row => {
+        const key = normalize([row.name, row.court, row.subject].join("|"));
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+      });
+    }
+
+    function isExactImportedTurnDuplicate(turn) {
+      const deKey = decreeKey(turn.deNumber);
+      return turns.some(existing => {
+        const samePeriod = String(existing.date || "").slice(0, 7) === String(turn.date || "").slice(0, 7);
+        const sameName = normalize(existing.name) === normalize(turn.name);
+        const sameCourt = normalize(existing.court) === normalize(turn.court);
+        const sameSubject = normalize(existing.subject) === normalize(turn.subject);
+        const existingDeKey = decreeKey(extractDeNumber(existing));
+        const sameDecree = !deKey || !existingDeKey || existingDeKey === deKey;
+        return samePeriod && sameName && sameCourt && sameSubject && sameDecree;
+      });
+    }
+
+    function renderDecreeImportPreview(rows) {
+      if (!els.decreeImportPreview) return;
+      if (!rows.length) {
+        els.decreeImportPreview.classList.add("visible");
+        els.decreeImportPreview.innerHTML = `<p class="save-note"><strong>No se detectaron abogados.</strong> El PDF puede estar escaneado como imagen o tener un formato distinto. En ese caso, sube el decreto y registra el turno manualmente.</p>`;
+        return;
+      }
+      els.decreeImportPreview.classList.add("visible");
+      els.decreeImportPreview.innerHTML = `
+        <p class="muted">${rows.length} abogado(s) detectado(s). Revisa y deja marcado solo lo que debe ingresar a la base histórica.</p>
+        ${rows.map((turn, index) => {
+          const duplicate = isExactImportedTurnDuplicate(turn);
+          return `
+            <div class="decree-import-row ${duplicate ? "duplicate" : ""}">
+              <div>
+                <strong>${escapeHtml(turn.name)}</strong>
+                <span>${escapeHtml(turn.email || "Sin correo")} · ${escapeHtml(turn.phone || "Sin teléfono")}</span>
+              </div>
+              <div>
+                <strong>${escapeHtml(turn.subject)}</strong>
+                <span>${escapeHtml(turn.court)}</span>
+              </div>
+              <div>
+                <strong>${duplicate ? "Ya existe" : "Listo para importar"}</strong>
+                <span>${escapeHtml(turn.month)} ${escapeHtml(turn.year)} · D.E. N° ${escapeHtml(turn.deNumber)}</span>
+              </div>
+              <label title="${duplicate ? "Duplicado exacto detectado" : "Incluir en la importación"}">
+                <input type="checkbox" data-decree-import-index="${index}" ${duplicate ? "disabled" : "checked"}>
+              </label>
+            </div>
+          `;
+        }).join("")}
+      `;
+    }
+
+    async function analyzeDecreeRosterFromForm() {
+      const year = els.decreeUploadYear?.value || "";
+      const month = els.decreeUploadMonth?.value || "";
+      const deNumber = els.decreeUploadNumber?.value.trim() || "";
+      const file = els.decreeUploadFile?.files?.[0];
+      if (!year || !month || !deNumber || !file) {
+        setDecreeUploadStatus("<strong>Faltan datos:</strong> completa año, mes, número de D.E. y adjunta el PDF antes de analizar.", "error");
+        return [];
+      }
+      if (!file.name.toLowerCase().endsWith(".pdf")) {
+        setDecreeUploadStatus("<strong>Archivo no válido:</strong> la lectura automática solo trabaja con documentos PDF.", "error");
+        return [];
+      }
+      els.analyzeDecreeRoster.disabled = true;
+      els.analyzeDecreeRoster.textContent = "Analizando...";
+      setDecreeUploadStatus("<strong>Analizando PDF...</strong> Buscando tribunales, materias y abogados del turno.", "info");
+      try {
+        const text = await extractPdfText(file);
+        detectedDecreeRoster = parseDecreeRoster(text, { year, month, deNumber });
+        renderDecreeImportPreview(detectedDecreeRoster);
+        if (detectedDecreeRoster.length) {
+          if (els.decreeImportCheckbox) els.decreeImportCheckbox.checked = true;
+          const duplicates = detectedDecreeRoster.filter(isExactImportedTurnDuplicate).length;
+          const available = detectedDecreeRoster.length - duplicates;
+          setDecreeUploadStatus(`<strong>Nómina detectada:</strong> ${available} registro(s) listo(s) para importar${duplicates ? ` y ${duplicates} duplicado(s) omitido(s)` : ""}.`, "success");
+        } else {
+          setDecreeUploadStatus("<strong>No se detectó nómina:</strong> sube el decreto normalmente o registra los turnos manualmente.", "error");
+        }
+        return detectedDecreeRoster;
+      } catch (error) {
+        detectedDecreeRoster = [];
+        renderDecreeImportPreview([]);
+        setDecreeUploadStatus(`<strong>No se pudo leer el PDF:</strong> ${escapeHtml(error?.message || "Error desconocido.")}`, "error");
+        return [];
+      } finally {
+        els.analyzeDecreeRoster.disabled = false;
+        els.analyzeDecreeRoster.textContent = "Analizar nómina del PDF";
+      }
+    }
+
+    function selectedDecreeRosterTurns() {
+      if (!els.decreeImportPreview) return [];
+      return [...els.decreeImportPreview.querySelectorAll("[data-decree-import-index]:checked")]
+        .map(input => detectedDecreeRoster[Number(input.dataset.decreeImportIndex)])
+        .filter(Boolean)
+        .filter(turn => !isExactImportedTurnDuplicate(turn));
+    }
+
+    async function importSelectedDecreeRosterTurns() {
+      const selectedTurns = selectedDecreeRosterTurns();
+      if (!selectedTurns.length) return { saved: 0, failed: 0, skipped: detectedDecreeRoster.length };
+      let saved = 0;
+      let failed = 0;
+      for (const turn of selectedTurns) {
+        const ok = await saveTurnToGoogleSheet(turn).catch(() => false);
+        if (ok) {
+          saved += 1;
+          turns.push(turn);
+        } else {
+          failed += 1;
+        }
+      }
+      return { saved, failed, skipped: detectedDecreeRoster.length - selectedTurns.length };
+    }
+
     function setDecreeUploadStatus(message, kind = "info") {
       if (!els.decreeUploadStatus) return;
       els.decreeUploadStatus.classList.add("visible");
@@ -4531,6 +4880,7 @@
         els.decreeUploadStatus.classList.remove("visible");
         els.decreeUploadStatus.innerHTML = "";
       }
+      resetDecreeImportPreview();
       els.decreeUploadModal.classList.add("visible");
       window.setTimeout(() => els.decreeUploadNumber?.focus(), 0);
     }
@@ -4547,6 +4897,7 @@
     function resetDecreeUploadForm() {
       if (els.decreeUploadNumber) els.decreeUploadNumber.value = "";
       if (els.decreeUploadFile) els.decreeUploadFile.value = "";
+      resetDecreeImportPreview();
     }
 
     async function uploadEconomicDecreeFromForm() {
@@ -4574,6 +4925,9 @@
       setDecreeUploadStatus("<strong>Preparando archivo...</strong> Leyendo PDF para enviarlo a Drive.", "info");
 
       try {
+        if (els.decreeImportCheckbox?.checked && !detectedDecreeRoster.length) {
+          await analyzeDecreeRosterFromForm();
+        }
         const filePayload = await readFilePayload(file);
         const payload = {
           year,
@@ -4592,10 +4946,22 @@
           const expected = normalize(deNumber);
           const exists = decrees.some(decree => normalize([decree.deNumber, decree.name].join(" ")).includes(expected));
           if (exists) {
-            resetDecreeUploadForm();
-            populateDecreeUploadOptions();
-            setDecreeUploadStatus(`<strong>Decreto cargado.</strong> Ya está disponible en la biblioteca como D.E. N° ${escapeHtml(deNumber)}.`, "success");
-            window.setTimeout(() => closeDecreeUploadModal(true), 900);
+            const shouldImportRoster = Boolean(els.decreeImportCheckbox?.checked && selectedDecreeRosterTurns().length);
+            if (shouldImportRoster) {
+              setDecreeUploadStatus("<strong>Decreto cargado.</strong> Importando los turnos seleccionados a la base histórica.", "info");
+              const result = await importSelectedDecreeRosterTurns();
+              await syncFromSheet({ keepSelected: true }).catch(() => renderAll());
+              setDecreeUploadStatus(
+                `<strong>Proceso finalizado.</strong> Decreto disponible e importación realizada: ${result.saved} turno(s) guardado(s)${result.failed ? `, ${result.failed} con error` : ""}${result.skipped ? `, ${result.skipped} omitido(s)` : ""}.`,
+                result.failed ? "error" : "success"
+              );
+              populateDecreeUploadOptions();
+            } else {
+              resetDecreeUploadForm();
+              populateDecreeUploadOptions();
+              setDecreeUploadStatus(`<strong>Decreto cargado.</strong> Ya está disponible en la biblioteca como D.E. N° ${escapeHtml(deNumber)}.`, "success");
+              window.setTimeout(() => closeDecreeUploadModal(true), 900);
+            }
           } else {
             setDecreeUploadStatus(`<strong>No pude confirmar la carga.</strong> Revisa permisos de Drive o publica el Apps Script actualizado; luego presiona “Actualizar biblioteca”.`, "error");
           }
@@ -5522,6 +5888,10 @@
         enabled: enabledValue,
         key: profile.key,
         name: profile.name,
+        rut: profile.latestNewLawyerRecord?.rut || profile.rut || "",
+        newBaseRowNumber: profile.latestNewLawyerRecord?.rowNumber || "",
+        isNewBaseLawyer: Boolean(profile.latestNewLawyerRecord),
+        sourceBase: profile.latestNewLawyerRecord ? "Abogados nuevos" : "Turnos historicos",
         phone: profile.phone,
         email: profile.email,
         reason,
@@ -5752,6 +6122,12 @@
         disableReason: enabledValue === "No" ? evidence.reason : "",
         disableDocumentUrl: enabledValue === "No" ? evidence.documentUrl : ""
       } : turn);
+      newLawyers = newLawyers.map(lawyer => personKey(lawyer) === key ? {
+        ...lawyer,
+        active: enabledValue,
+        disableReason: enabledValue === "No" ? evidence.reason : "",
+        disableDocumentUrl: enabledValue === "No" ? evidence.documentUrl : ""
+      } : lawyer);
       renderAll();
       renderLawyerDetail(groupLawyers().find(item => item.key === key));
       showToast("Cambio aplicado en pantalla. Sincronizando con Google Sheets...");
@@ -5763,6 +6139,12 @@
           disableReason: profile.disableReason || "",
           disableDocumentUrl: profile.disableDocumentUrl || ""
         } : turn);
+        newLawyers = newLawyers.map(lawyer => personKey(lawyer) === key ? {
+          ...lawyer,
+          active: currentValue,
+          disableReason: profile.disableReason || "",
+          disableDocumentUrl: profile.disableDocumentUrl || ""
+        } : lawyer);
         renderAll();
         renderLawyerDetail(groupLawyers().find(item => item.key === key));
         showToast(result.message || "No se pudo actualizar la planilla. Revisa que el Apps Script esté actualizado y desplegado.");
@@ -6317,6 +6699,11 @@
     els.decreeUploadModal.addEventListener("click", event => {
       if (event.target === els.decreeUploadModal) closeDecreeUploadModal();
     });
+    els.analyzeDecreeRoster.addEventListener("click", analyzeDecreeRosterFromForm);
+    [els.decreeUploadYear, els.decreeUploadMonth, els.decreeUploadNumber, els.decreeUploadFile].forEach(control => {
+      control?.addEventListener("change", resetDecreeImportPreview);
+    });
+    els.decreeUploadNumber?.addEventListener("input", resetDecreeImportPreview);
     els.uploadDecreeButton.addEventListener("click", uploadEconomicDecreeFromForm);
     els.decreeYearFilter.addEventListener("change", renderDecrees);
     ["input", "search", "keyup", "paste"].forEach(eventName => {
