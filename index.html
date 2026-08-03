@@ -2593,7 +2593,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1ibluVbe3JQ9AnOoZzZCsjinJ7Mkrjxah2ONjdbGlcBVE_itH-PQnhE-aooQ_FF1z/exec";
-    const APP_VERSION = "1.9.7-importacion-decreto-editable";
+    const APP_VERSION = "1.9.8-importacion-decreto-domicilios";
     const DISPLAY_VERSION = "Versión N°1, 24.06.2026";
     const REQUIRED_SCRIPT_VERSION = "2026-07-14-newlawyer-enabled-v31";
     const ACCEPTED_SCRIPT_VERSIONS = [
@@ -4796,6 +4796,12 @@
       return canonicalCourtName(match?.[1] || defaultCourt || "");
     }
 
+    function addressFromDecreeEntry(entry) {
+      const segmentOneLine = compactSpaces(entry);
+      const addressMatch = segmentOneLine.match(/(?:domiciliad[oa]\s+en|domicilio\s+en)\s+(.+?)(?=,\s*(?:tel\.?|fono|cel(?:ular)?\.?|email|correo)\b|\s+(?:tel\.?|fono|cel(?:ular)?\.?|email|correo)\b|$)/i);
+      return addressMatch ? compactSpaces(addressMatch[1]).replace(/[,:;.-]+$/g, "") : "";
+    }
+
     function parseDecreeRosterEntry(entry, context, { year, month, deNumber }) {
       const period = `${year}-${String(month).padStart(2, "0")}`;
       const monthLabel = monthNameFromCode(month);
@@ -4811,8 +4817,7 @@
       const email = segmentOneLine.match(/[A-Z0-9._%+-]+@[A-Z0-9.-]+\.[A-Z]{2,}/i)?.[0] || "";
       const phoneMatch = segmentOneLine.match(/(?:tel\.?|fono|cel(?:ular)?\.?)\s*[:.]?\s*([+0-9\s().-]{7,24})/i);
       const phone = phoneMatch ? compactSpaces(phoneMatch[1]).replace(/[^\d+\s-]/g, "").trim() : "";
-      const addressMatch = segmentOneLine.match(/domiciliad[oa]\s+en\s+(.+?)(?=,\s*(?:tel\.?|fono|cel(?:ular)?\.?|email|correo)\b|\s+(?:tel\.?|fono|cel(?:ular)?\.?|email|correo)\b|$)/i);
-      const address = addressMatch ? compactSpaces(addressMatch[1]).replace(/[,:;.-]+$/g, "") : "";
+      const address = addressFromDecreeEntry(segmentOneLine);
       const subject = canonicalSubjectName(context.subject || subjectFromDecreeContext(entry));
       const court = courtFromDecreeEntry(entry, context.court);
 
