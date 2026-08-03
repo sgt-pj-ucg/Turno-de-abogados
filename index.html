@@ -547,15 +547,25 @@
       display: grid;
     }
 
+    #decreeUploadModal {
+      align-items: start;
+      overflow-y: auto;
+    }
+
+    #decreeUploadModal .modal {
+      width: min(1180px, calc(100vw - 32px));
+      max-height: calc(100vh - 32px);
+    }
+
     .decree-import-row {
       border: 1px solid #dce3ee;
       border-radius: 8px;
-      padding: 10px;
+      padding: 12px;
       background: #fff;
       display: grid;
-      grid-template-columns: minmax(0, 1.2fr) minmax(0, 1fr) minmax(0, 1fr) auto;
-      gap: 10px;
-      align-items: center;
+      grid-template-columns: 28px minmax(0, 1fr);
+      gap: 12px;
+      align-items: start;
     }
 
     .decree-import-row.duplicate {
@@ -578,7 +588,57 @@
     .decree-import-row input[type="checkbox"] {
       width: 18px;
       height: 18px;
+      margin-top: 30px;
       accent-color: var(--navy);
+    }
+
+    .decree-import-card {
+      display: grid;
+      gap: 10px;
+    }
+
+    .decree-import-card-header {
+      display: flex;
+      justify-content: space-between;
+      gap: 12px;
+      align-items: center;
+      flex-wrap: wrap;
+    }
+
+    .decree-import-card-header strong {
+      font-size: 1rem;
+    }
+
+    .decree-import-fields {
+      display: grid;
+      grid-template-columns: minmax(220px, 1.4fr) minmax(150px, .75fr) minmax(210px, 1fr) minmax(150px, .8fr);
+      gap: 10px;
+    }
+
+    .decree-import-fields .field {
+      gap: 4px;
+    }
+
+    .decree-import-fields input,
+    .decree-import-fields select {
+      min-height: 42px;
+      padding: 10px 12px;
+      font-size: .95rem;
+    }
+
+    .decree-import-fields .wide {
+      grid-column: span 2;
+    }
+
+    .decree-import-status {
+      display: inline-flex;
+      align-items: center;
+      border-radius: 999px;
+      padding: 6px 10px;
+      background: #eaf2ff;
+      color: #2f5f9f;
+      font-weight: 700;
+      font-size: .78rem;
     }
 
     .decree-panel-header {
@@ -1782,7 +1842,8 @@
       .actions { justify-content: stretch; }
       .actions .btn { flex: 1; }
       .contact-toolbar { align-items: flex-start; flex-direction: column; }
-      .metrics, .contact-grid, .summary-grid, .form-grid, .turn-meta-grid, .rank-controls, .alert-grid, .alert-edit-grid, .document-row, .period-picker, .new-lawyer-main-fields, .new-lawyer-contact-fields, .new-lawyer-detail-fields, .new-lawyer-actions, .decree-upload-grid, .decree-upload-actions, .decree-import-row, .alert-contact-grid, .manual-grid { grid-template-columns: 1fr; }
+      .metrics, .contact-grid, .summary-grid, .form-grid, .turn-meta-grid, .rank-controls, .alert-grid, .alert-edit-grid, .document-row, .period-picker, .new-lawyer-main-fields, .new-lawyer-contact-fields, .new-lawyer-detail-fields, .new-lawyer-actions, .decree-upload-grid, .decree-upload-actions, .decree-import-row, .decree-import-fields, .alert-contact-grid, .manual-grid { grid-template-columns: 1fr; }
+      .decree-import-fields .wide { grid-column: auto; }
       .rank-search { grid-column: span 1; }
       .alert-address-field,
       .alert-save-cell { grid-column: auto; }
@@ -2532,7 +2593,7 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1ibluVbe3JQ9AnOoZzZCsjinJ7Mkrjxah2ONjdbGlcBVE_itH-PQnhE-aooQ_FF1z/exec";
-    const APP_VERSION = "1.9.6-importacion-decreto-turno";
+    const APP_VERSION = "1.9.7-importacion-decreto-editable";
     const DISPLAY_VERSION = "Versión N°1, 24.06.2026";
     const REQUIRED_SCRIPT_VERSION = "2026-07-14-newlawyer-enabled-v31";
     const ACCEPTED_SCRIPT_VERSIONS = [
@@ -4692,9 +4753,9 @@
 
     function cleanDecreeLawyerName(value) {
       return compactSpaces(value)
-        .replace(/^[\s:;.,\->–•➢]+/g, "")
+        .replace(/^[\s:;.,\->–•➢\uF0D8]+/g, "")
         .replace(/^\d+\s*[).-]\s*/g, "")
-        .replace(/^(don\s*\(\s*ña\s*\)|don\s*\(\s*a\s*\)|don|doña|dona|sr\.?|sra\.?)\s+/i, "")
+        .replace(/^(don\s*\(\s*ña\s*\)|don\s*\(\s*a\s*\)|don|doña|dona|sr\.?|sra\.?)\s*/i, "")
         .replace(/[,:;.-]+$/g, "")
         .trim();
     }
@@ -4702,8 +4763,8 @@
     function cleanDecreeTextForRoster(text) {
       let cleaned = String(text || "")
         .replace(/---PAGE\s+\d+---/gi, "\n")
-        .replace(/Este documento tiene firma electrónica[\s\S]*?Código:\s*[A-Z0-9]+/gi, "\n")
-        .replace(/\uF0D8/g, "➢");
+        .replace(/Este\s*documento\s*tiene\s*firma\s*electr[oó]nica[\s\S]*?C[oó]digo\s*:?\s*[A-Z0-9]+/gi, "\n")
+        .replace(/[\uF0D8\u2022]/g, "➢");
       cleaned = cleaned.replace(/^[\s\S]*?1\.-\s*TURNO\s+ABOGADOS\s*:?\s*/i, "\n");
       cleaned = cleaned.replace(/\n\s*2\.-\s*TURNO\s+NOTAR[IÍ]AS[\s\S]*$/i, "\n");
       cleaned = cleaned.replace(/\n\s*3\.-\s*RECEPTORES[\s\S]*$/i, "\n");
@@ -4788,6 +4849,9 @@
       };
 
       lines.forEach(line => {
+        if (/este\s*documento\s*tiene\s*firma|verificadoc\.pjud\.cl|c[oó]digo\s*:/i.test(line)) {
+          return;
+        }
         if (/^\d+\.-\s*(turno\s+notar|receptores|procurador)/i.test(line)) {
           flushEntry();
           return;
@@ -4838,26 +4902,56 @@
       }
       els.decreeImportPreview.classList.add("visible");
       els.decreeImportPreview.innerHTML = `
-        <p class="muted">${rows.length} abogado(s) detectado(s). Revisa y deja marcado solo lo que debe ingresar a la base histórica.</p>
+        <p class="muted">${rows.length} abogado(s) detectado(s). Revisa, corrige si es necesario y deja marcado solo lo que debe ingresar a la base histórica.</p>
         ${rows.map((turn, index) => {
           const duplicate = isExactImportedTurnDuplicate(turn);
           return `
             <div class="decree-import-row ${duplicate ? "duplicate" : ""}">
-              <div>
-                <strong>${escapeHtml(turn.name)}</strong>
-                <span>${escapeHtml(turn.email || "Sin correo")} · ${escapeHtml(turn.phone || "Sin teléfono")}</span>
-              </div>
-              <div>
-                <strong>${escapeHtml(turn.subject)}</strong>
-                <span>${escapeHtml(turn.court)}</span>
-              </div>
-              <div>
-                <strong>${duplicate ? "Ya existe" : "Listo para importar"}</strong>
-                <span>${escapeHtml(turn.month)} ${escapeHtml(turn.year)} · D.E. N° ${escapeHtml(turn.deNumber)}</span>
-              </div>
               <label title="${duplicate ? "Duplicado exacto detectado" : "Incluir en la importación"}">
                 <input type="checkbox" data-decree-import-index="${index}" ${duplicate ? "disabled" : "checked"}>
               </label>
+              <div class="decree-import-card">
+                <div class="decree-import-card-header">
+                  <strong>${escapeHtml(turn.name)}</strong>
+                  <span class="decree-import-status">${duplicate ? "Ya existe en la base" : "Listo para importar"} · ${escapeHtml(turn.month)} ${escapeHtml(turn.year)} · D.E. N° ${escapeHtml(turn.deNumber)}</span>
+                </div>
+                <div class="decree-import-fields">
+                  <div class="field wide">
+                    <label>Nombre completo</label>
+                    <input data-decree-import-field="name" value="${escapeHtml(turn.name)}" placeholder="Nombre completo">
+                  </div>
+                  <div class="field">
+                    <label>RUT</label>
+                    <input data-decree-import-field="rut" value="${escapeHtml(turn.rut ? formatRut(turn.rut) : "")}" placeholder="12.345.678-9">
+                  </div>
+                  <div class="field">
+                    <label>Estado</label>
+                    <select data-decree-import-field="status">
+                      ${["Programado", "Turno realizado", "Original vigente"].map(option => `<option value="${escapeHtml(option)}" ${option === turn.status ? "selected" : ""}>${escapeHtml(option)}</option>`).join("")}
+                    </select>
+                  </div>
+                  <div class="field">
+                    <label>Materia</label>
+                    <input data-decree-import-field="subject" list="subjectOptions" value="${escapeHtml(turn.subject)}" placeholder="Materia">
+                  </div>
+                  <div class="field">
+                    <label>Tribunal</label>
+                    <input data-decree-import-field="court" list="courtOptions" value="${escapeHtml(turn.court)}" placeholder="Tribunal">
+                  </div>
+                  <div class="field">
+                    <label>Correo</label>
+                    <input data-decree-import-field="email" value="${escapeHtml(turn.email || "")}" placeholder="correo@dominio.cl">
+                  </div>
+                  <div class="field">
+                    <label>Teléfono</label>
+                    <input data-decree-import-field="phone" value="${escapeHtml(turn.phone || "")}" placeholder="Teléfono">
+                  </div>
+                  <div class="field wide">
+                    <label>Domicilio</label>
+                    <input data-decree-import-field="address" value="${escapeHtml(turn.address || "")}" placeholder="Domicilio profesional">
+                  </div>
+                </div>
+              </div>
             </div>
           `;
         }).join("")}
@@ -4907,8 +5001,27 @@
     function selectedDecreeRosterTurns() {
       if (!els.decreeImportPreview) return [];
       return [...els.decreeImportPreview.querySelectorAll("[data-decree-import-index]:checked")]
-        .map(input => detectedDecreeRoster[Number(input.dataset.decreeImportIndex)])
+        .map(input => {
+          const base = detectedDecreeRoster[Number(input.dataset.decreeImportIndex)];
+          const row = input.closest(".decree-import-row");
+          if (!base || !row) return null;
+          const readField = field => row.querySelector(`[data-decree-import-field="${field}"]`)?.value.trim() || "";
+          return {
+            ...base,
+            name: cleanDecreeLawyerName(readField("name") || base.name),
+            rut: formatRut(readField("rut") || base.rut || ""),
+            email: readField("email") || base.email || "",
+            phone: readField("phone") || base.phone || "",
+            address: readField("address") || base.address || "",
+            court: canonicalCourtName(readField("court") || base.court || ""),
+            subject: canonicalSubjectName(readField("subject") || base.subject || ""),
+            status: readField("status") || base.status || "Programado",
+            active: "Sí",
+            notes: `Designado por D.E. N° ${base.deNumber}. Importado desde decreto económico.`
+          };
+        })
         .filter(Boolean)
+        .filter(turn => turn.name && normalize(turn.name).split(" ").length >= 2)
         .filter(turn => !isExactImportedTurnDuplicate(turn));
     }
 
@@ -6762,6 +6875,10 @@
     els.cancelDecreeUpload.addEventListener("click", closeDecreeUploadModal);
     els.decreeUploadModal.addEventListener("click", event => {
       if (event.target === els.decreeUploadModal) closeDecreeUploadModal();
+    });
+    els.decreeUploadModal.addEventListener("input", event => {
+      const input = event.target.closest('[data-decree-import-field="rut"]');
+      if (input) input.value = formatRut(input.value);
     });
     els.analyzeDecreeRoster.addEventListener("click", analyzeDecreeRosterFromForm);
     [els.decreeUploadYear, els.decreeUploadMonth, els.decreeUploadNumber, els.decreeUploadFile].forEach(control => {
