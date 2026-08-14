@@ -2593,13 +2593,13 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1ibluVbe3JQ9AnOoZzZCsjinJ7Mkrjxah2ONjdbGlcBVE_itH-PQnhE-aooQ_FF1z/exec";
-    const APP_VERSION = "1.9.9-importacion-turnos-confirmada";
+    const APP_VERSION = "1.10.0-usuarios-centralizados";
     const DISPLAY_VERSION = "Versión N°1, 24.06.2026";
-    // The public deployment currently exposes v30. It already includes the
-    // authenticated append action used by the decree roster import.
-    const REQUIRED_SCRIPT_VERSION = "2026-06-25-integrity-audit-v30";
+    // La versión v31 mantiene las acciones autenticadas y centraliza los usuarios.
+    const REQUIRED_SCRIPT_VERSION = "2026-07-14-newlawyer-enabled-v31";
     const ACCEPTED_SCRIPT_VERSIONS = [
-      "2026-06-25-integrity-audit-v30"
+      "2026-06-25-integrity-audit-v30",
+      "2026-07-14-newlawyer-enabled-v31"
     ];
     const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
