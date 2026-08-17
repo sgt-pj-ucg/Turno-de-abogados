@@ -2408,8 +2408,8 @@
                 <li>En la ficha del abogado, ubica el selector <strong>Habilitado para turno</strong>.</li>
                 <li>Selecciona <strong>Sí</strong> cuando el abogado pueda ser considerado en futuros turnos.</li>
                 <li>Selecciona <strong>No</strong> cuando exista una razón que impida considerarlo en el ranking.</li>
-                <li>Al marcar <strong>No</strong>, debes elegir una causal, escribir una justificación breve y adjuntar el documento de respaldo.</li>
-                <li>Mientras no se adjunte el respaldo solicitado, el sistema no permitirá completar el cambio.</li>
+                <li>Al marcar <strong>No</strong>, debes elegir una causal o escribir una justificación breve. La razón es obligatoria.</li>
+                <li>El documento de respaldo es opcional. Cuando exista, puedes adjuntarlo y quedará disponible desde la ficha.</li>
                 <li>Un abogado no habilitado no aparecerá como candidato en el ranking de nuevo turno.</li>
               </ol>
             </article>
@@ -2558,7 +2558,7 @@
       <div class="modal-body">
         <p class="modal-note">
           Se dejará al abogado(a) <strong id="disableLawyerName"></strong> como no habilitado para turno.
-          Debes seleccionar una razón y adjuntar el documento que la respalda.
+          Debes seleccionar una razón. El documento de respaldo es opcional.
         </p>
         <div class="field">
           <label for="disableReasonSelect">Razón</label>
@@ -2574,9 +2574,9 @@
           <p class="field-help"><span id="disableOtherCounter">0</span>/100 caracteres.</p>
         </div>
         <div class="field">
-          <label for="disableDocumentFile">Documento de respaldo</label>
+          <label for="disableDocumentFile">Documento de respaldo (opcional)</label>
           <input id="disableDocumentFile" type="file" accept=".pdf,.doc,.docx,.jpg,.jpeg,.png">
-          <p class="field-help">El archivo se cargará en Drive con el nombre del abogado(a), fecha y nombre original. Máximo 8 MB.</p>
+          <p class="field-help">Si lo adjuntas, se cargará en Drive con el nombre del abogado(a), fecha y nombre original. Máximo 8 MB.</p>
         </div>
       </div>
       <div class="modal-actions">
@@ -2593,13 +2593,12 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1ibluVbe3JQ9AnOoZzZCsjinJ7Mkrjxah2ONjdbGlcBVE_itH-PQnhE-aooQ_FF1z/exec";
-    const APP_VERSION = "1.10.0-usuarios-centralizados";
+    const APP_VERSION = "1.10.1-habilitacion-confirmada";
     const DISPLAY_VERSION = "Versión N°1, 24.06.2026";
-    // La versión v31 mantiene las acciones autenticadas y centraliza los usuarios.
-    const REQUIRED_SCRIPT_VERSION = "2026-07-14-newlawyer-enabled-v31";
+    // La versión v32 confirma la escritura de habilitación directamente en Google Sheets.
+    const REQUIRED_SCRIPT_VERSION = "2026-08-17-habilitacion-confirmada-v32";
     const ACCEPTED_SCRIPT_VERSIONS = [
-      "2026-06-25-integrity-audit-v30",
-      "2026-07-14-newlawyer-enabled-v31"
+      "2026-08-17-habilitacion-confirmada-v32"
     ];
     const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
@@ -3212,27 +3211,25 @@
         els.disableOtherReason.focus();
         return null;
       }
-      if (!file) {
-        showToast("Adjunta el documento de respaldo antes de confirmar.");
-        els.disableDocumentFile.focus();
-        return null;
-      }
-      if (file.size > DISABLE_FILE_MAX_BYTES) {
+      if (file && file.size > DISABLE_FILE_MAX_BYTES) {
         showToast("El documento supera 8 MB. Usa un archivo más liviano.");
         els.disableDocumentFile.focus();
         return null;
       }
 
-      const filePayload = await fileToEvidencePayload(file).catch(error => {
-        showToast(error.message || "No se pudo preparar el archivo.");
-        return null;
-      });
-      if (!filePayload) return null;
+      let filePayload = {};
+      if (file) {
+        filePayload = await fileToEvidencePayload(file).catch(error => {
+          showToast(error.message || "No se pudo preparar el archivo.");
+          return null;
+        });
+        if (!filePayload) return null;
+      }
 
       return {
         reason,
         documentUrl: "",
-        combinedReason: `${reason} | Respaldo documental adjunto`,
+        combinedReason: file ? `${reason} | Respaldo documental adjunto` : reason,
         ...filePayload
       };
     }
@@ -6085,7 +6082,7 @@
             iframe.remove();
             form.remove();
           }, 1000);
-          resolve({ ok: true, updated: 1, message: "Solicitud enviada al Apps Script." });
+          resolve({ ok: true, submitted: true, message: "Solicitud enviada al Apps Script." });
         }
 
         iframe.name = frameName;
@@ -6111,7 +6108,76 @@
       });
     }
 
-    function updateEnabledInGoogleSheet(profile, enabledValue, evidence = {}) {
+    function callAppsScriptJsonp(action, payload, timeoutMs = 12000) {
+      return new Promise(resolve => {
+        const callbackName = `appsJsonp_${action}_${Date.now()}_${Math.round(Math.random() * 100000)}`;
+        const script = document.createElement("script");
+        const timer = window.setTimeout(() => {
+          cleanup();
+          resolve({ ok: false, message: `El Apps Script no respondió a ${action}.` });
+        }, timeoutMs);
+
+        function cleanup() {
+          window.clearTimeout(timer);
+          script.remove();
+          delete window[callbackName];
+        }
+
+        window[callbackName] = response => {
+          cleanup();
+          resolve(response || { ok: false, message: "Respuesta vacía de Apps Script." });
+        };
+        script.onerror = () => {
+          cleanup();
+          resolve({ ok: false, message: `No se pudo ejecutar ${action} en Apps Script.` });
+        };
+
+        const params = new URLSearchParams({
+          action,
+          callback: callbackName,
+          payload: JSON.stringify(payload)
+        });
+        script.src = `${GOOGLE_APPS_SCRIPT_URL}?${params.toString()}`;
+        document.head.appendChild(script);
+      });
+    }
+
+    const wait = milliseconds => new Promise(resolve => window.setTimeout(resolve, milliseconds));
+
+    async function confirmEnabledPersisted(payload) {
+      const expectedEnabled = normalize(payload.enabled) === "no" ? "no" : "si";
+      const expectedReason = normalizeText(payload.enabled === "No" ? payload.reason : "");
+      let lastMessage = "";
+
+      for (let attempt = 0; attempt < 12; attempt += 1) {
+        const result = await callAppsScriptJsonp("enabledstatus", {
+          name: payload.name,
+          rut: payload.rut,
+          newBaseRowNumber: payload.newBaseRowNumber,
+          isNewBaseLawyer: payload.isNewBaseLawyer,
+          sourceBase: payload.sourceBase,
+          actorToken: payload.actorToken
+        }, 8000);
+        if (result.ok && result.found) {
+          const enabledMatches = normalize(result.enabled) === expectedEnabled;
+          const reasonMatches = expectedEnabled !== "no" || normalizeText(result.reason) === expectedReason;
+          if (enabledMatches && reasonMatches) {
+            return { ok: true, updated: result.updated || 1, message: "Cambio confirmado en Google Sheets." };
+          }
+          lastMessage = "La planilla aún no refleja el estado o motivo solicitado.";
+        } else {
+          lastMessage = result.message || "No se pudo confirmar la escritura en la planilla.";
+        }
+        await wait(1400);
+      }
+      return {
+        ok: false,
+        updated: 0,
+        message: lastMessage || "No se pudo confirmar el cambio en Google Sheets. La pantalla no fue actualizada."
+      };
+    }
+
+    async function updateEnabledInGoogleSheet(profile, enabledValue, evidence = {}) {
       if (!GOOGLE_APPS_SCRIPT_URL) return Promise.resolve({ ok: false, message: "No hay Apps Script configurado." });
       const reason = typeof evidence === "string" ? evidence : evidence.reason || "";
       const documentUrl = typeof evidence === "object" ? evidence.documentUrl || "" : "";
@@ -6134,48 +6200,13 @@
         actor: currentActor()
       };
 
-      if (payload.fileData) {
-        return postToAppsScriptForm("setenabled", payload);
+      const submitted = payload.fileData
+        ? await postToAppsScriptForm("setenabled", payload)
+        : await callAppsScriptJsonp("setenabled", payload);
+      if (!submitted.ok || (!payload.fileData && !submitted.updated)) {
+        return submitted;
       }
-
-      return new Promise(resolve => {
-        const callbackName = `enabledSave_${Date.now()}_${Math.round(Math.random() * 100000)}`;
-        const script = document.createElement("script");
-        const timer = window.setTimeout(() => {
-          cleanup();
-          resolve({
-            ok: false,
-            message: "El Apps Script publicado no respondió a setEnabled. Copia el script actualizado y vuelve a desplegarlo."
-          });
-        }, 12000);
-
-        function cleanup() {
-          window.clearTimeout(timer);
-          script.remove();
-          delete window[callbackName];
-        }
-
-        window[callbackName] = payload => {
-          cleanup();
-          resolve(payload || { ok: false, message: "Respuesta vacía de Apps Script." });
-        };
-
-        script.onerror = () => {
-          cleanup();
-          resolve({
-            ok: false,
-            message: "El Apps Script no pudo ejecutarse. Revisa que la versión publicada incluya setEnabled."
-          });
-        };
-
-        const params = new URLSearchParams({
-          action: "setenabled",
-          callback: callbackName,
-          payload: JSON.stringify(payload)
-        });
-        script.src = `${GOOGLE_APPS_SCRIPT_URL}?${params.toString()}`;
-        document.head.appendChild(script);
-      });
+      return confirmEnabledPersisted(payload);
     }
 
     function updateContactInGoogleSheet(profile, contact) {
@@ -6330,7 +6361,7 @@
     async function setLawyerEnabled(key, enabledValue) {
       const profile = groupLawyers().find(item => item.key === key);
       if (!profile) return;
-      if (!canWriteSafely()) return;
+      if (!(await canWriteSafelyAsync())) return;
       const currentValue = profile.active ? "Sí" : "No";
       if (currentValue === enabledValue) return;
       const evidence = enabledValue === "No" ? await requestDisableEvidence(profile) : { reason: "", documentUrl: "" };
@@ -6347,51 +6378,36 @@
       if (!confirmed) return;
 
       els.lawyerDetail.querySelectorAll("[data-enabled-value]").forEach(button => button.disabled = true);
-      turns = turns.map(turn => personKey(turn) === key ? {
-        ...turn,
-        active: enabledValue,
-        disableReason: enabledValue === "No" ? evidence.reason : "",
-        disableDocumentUrl: enabledValue === "No" ? evidence.documentUrl : ""
-      } : turn);
-      newLawyers = newLawyers.map(lawyer => personKey(lawyer) === key ? {
-        ...lawyer,
-        active: enabledValue,
-        disableReason: enabledValue === "No" ? evidence.reason : "",
-        disableDocumentUrl: enabledValue === "No" ? evidence.documentUrl : ""
-      } : lawyer);
-      renderAll();
-      renderLawyerDetail(groupLawyers().find(item => item.key === key));
-      showToast("Cambio aplicado en pantalla. Sincronizando con Google Sheets...");
+      showToast("Guardando habilitación en Google Sheets...");
       const result = await updateEnabledInGoogleSheet(profile, enabledValue, evidence);
       if (!result.ok || !result.updated) {
-        turns = turns.map(turn => personKey(turn) === key ? {
-          ...turn,
-          active: currentValue,
-          disableReason: profile.disableReason || "",
-          disableDocumentUrl: profile.disableDocumentUrl || ""
-        } : turn);
-        newLawyers = newLawyers.map(lawyer => personKey(lawyer) === key ? {
-          ...lawyer,
-          active: currentValue,
-          disableReason: profile.disableReason || "",
-          disableDocumentUrl: profile.disableDocumentUrl || ""
-        } : lawyer);
-        renderAll();
-        renderLawyerDetail(groupLawyers().find(item => item.key === key));
-        showToast(result.message || "No se pudo actualizar la planilla. Revisa que el Apps Script esté actualizado y desplegado.");
+        renderLawyerDetail(profile);
+        showToast(result.message || "No se pudo confirmar el cambio en Google Sheets. El estado no fue modificado en pantalla.");
         return;
       }
 
-      showToast(`Habilitación actualizada: ${profile.name} quedó en ${enabledValue}.`);
-      syncChangeHistory({ silent: true });
-      if (evidence?.fileData) {
-        showToast("Cambio enviado con documento adjunto. Sincronizaré en unos segundos para confirmar la planilla.");
-        window.setTimeout(() => {
-          syncFromSheet({ keepSelected: true }).catch(() => showToast("Cambio enviado; no se pudo refrescar la planilla en este momento."));
-        }, 22000);
-        return;
+      try {
+        await syncFromSheet({ keepSelected: true });
+        showToast(`Habilitación guardada en Google Sheets: ${profile.name} quedó en ${enabledValue}.`);
+      } catch (error) {
+        // La escritura fue confirmada por Apps Script; se conserva el cambio local hasta el próximo refresco.
+        turns = turns.map(turn => personKey(turn) === key ? {
+          ...turn,
+          active: enabledValue,
+          disableReason: enabledValue === "No" ? evidence.reason : "",
+          disableDocumentUrl: enabledValue === "No" ? evidence.documentUrl : ""
+        } : turn);
+        newLawyers = newLawyers.map(lawyer => personKey(lawyer) === key ? {
+          ...lawyer,
+          active: enabledValue,
+          disableReason: enabledValue === "No" ? evidence.reason : "",
+          disableDocumentUrl: enabledValue === "No" ? evidence.documentUrl : ""
+        } : lawyer);
+        renderAll();
+        renderLawyerDetail(groupLawyers().find(item => item.key === key));
+        showToast(`Habilitación guardada en Google Sheets. No se pudo recargar la pantalla: ${error.message || "intenta sincronizar datos."}`);
       }
-      syncFromSheet({ keepSelected: true }).catch(() => showToast("Cambio guardado; no se pudo refrescar la planilla en este momento."));
+      syncChangeHistory({ silent: true });
     }
 
     function matchingLawyerTurns(turn) {
