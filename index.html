@@ -1240,6 +1240,43 @@
       display: grid;
     }
 
+    .phone-status-line {
+      margin-top: 8px;
+    }
+
+    .phone-status-badge {
+      display: inline-flex;
+      align-items: center;
+      min-height: 24px;
+      padding: 3px 9px;
+      border-radius: 999px;
+      font-size: 12px;
+      font-weight: 800;
+      line-height: 1.15;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .phone-status-badge.pending { background: #edf1f6; color: #5b6878; }
+    .phone-status-badge.valid { background: #e6f5ee; color: #22724f; }
+    .phone-status-badge.warning { background: #fff3db; color: #8a6117; }
+    .phone-status-badge.invalid { background: #fde9e7; color: #ab3e2b; }
+    .phone-status-badge.empty { background: #f0f2f5; color: #677181; }
+
+    .phone-note {
+      display: block;
+      margin-top: 7px;
+      color: var(--muted);
+      font-size: 12px;
+      line-height: 1.35;
+      text-transform: none;
+      letter-spacing: 0;
+    }
+
+    .contact-phone-note-field {
+      grid-column: 1 / -1;
+    }
+
     .contact-edit-actions {
       display: flex;
       justify-content: flex-end;
@@ -1715,6 +1752,14 @@
       grid-column: 1 / span 3;
     }
 
+    .alert-phone-status-field {
+      grid-column: 1 / span 2;
+    }
+
+    .alert-phone-note-field {
+      grid-column: 1 / span 3;
+    }
+
     .alert-save-cell {
       grid-column: 4;
       display: flex;
@@ -1867,6 +1912,8 @@
       .decree-import-fields .wide { grid-column: auto; }
       .rank-search { grid-column: span 1; }
       .alert-address-field,
+      .alert-phone-status-field,
+      .alert-phone-note-field,
       .alert-save-cell { grid-column: auto; }
       .alert-save-cell { justify-content: stretch; min-height: 0; }
       .alert-edit-grid .btn { width: 100%; }
@@ -2614,12 +2661,12 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1ibluVbe3JQ9AnOoZzZCsjinJ7Mkrjxah2ONjdbGlcBVE_itH-PQnhE-aooQ_FF1z/exec";
-    const APP_VERSION = "1.10.1-habilitacion-confirmada";
+    const APP_VERSION = "1.10.2-estado-telefono";
     const DISPLAY_VERSION = "Versión N°1, 24.06.2026";
-    // La versión v32 confirma la escritura de habilitación directamente en Google Sheets.
-    const REQUIRED_SCRIPT_VERSION = "2026-08-17-habilitacion-confirmada-v32";
+    // La versión v33 agrega el estado independiente de verificación telefónica.
+    const REQUIRED_SCRIPT_VERSION = "2026-08-17-estado-telefono-v33";
     const ACCEPTED_SCRIPT_VERSIONS = [
-      "2026-08-17-habilitacion-confirmada-v32"
+      "2026-08-17-estado-telefono-v33"
     ];
     const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
@@ -3139,6 +3186,42 @@
       return issues;
     }
 
+    const PHONE_CONTACT_STATUS_OPTIONS = [
+      "Pendiente de verificar",
+      "Teléfono vigente",
+      "No contesta",
+      "Número inexistente o no corresponde",
+      "Sin teléfono"
+    ];
+
+    function resolvedPhoneStatus(status, phone) {
+      const requestedStatus = String(status || "").trim();
+      if (PHONE_CONTACT_STATUS_OPTIONS.includes(requestedStatus)) return requestedStatus;
+      return hasData(phone) ? "Pendiente de verificar" : "Sin teléfono";
+    }
+
+    function phoneStatusClass(status, phone) {
+      switch (normalize(resolvedPhoneStatus(status, phone))) {
+        case "telefono vigente": return "valid";
+        case "no contesta": return "warning";
+        case "numero inexistente o no corresponde": return "invalid";
+        case "sin telefono": return "empty";
+        default: return "pending";
+      }
+    }
+
+    function phoneStatusOptions(profile) {
+      const selected = resolvedPhoneStatus(profile.phoneStatus, profile.phone);
+      return PHONE_CONTACT_STATUS_OPTIONS.map(status => `
+        <option value="${escapeHtml(status)}" ${status === selected ? "selected" : ""}>${escapeHtml(status)}</option>
+      `).join("");
+    }
+
+    function hasPhoneContactAlert(profile) {
+      const status = normalize(resolvedPhoneStatus(profile.phoneStatus, profile.phone));
+      return status === "no contesta" || status === "numero inexistente o no corresponde";
+    }
+
     function validateContact(contact) {
       const errors = [];
       const warnings = [];
@@ -3147,6 +3230,7 @@
       const phone = String(contact.phone || "").trim();
       const address = String(contact.address || "").trim();
       const phoneDigits = phone.replace(/\D/g, "");
+      const phoneStatus = normalize(resolvedPhoneStatus(contact.phoneStatus, phone));
 
       if (rut && !isValidRut(rut)) {
         errors.push("El RUT no es válido. Revisa número y dígito verificador.");
@@ -3156,6 +3240,9 @@
       }
       if (phone && phoneDigits.length < 9) {
         errors.push("El teléfono debe tener al menos 9 dígitos.");
+      }
+      if (["no contesta", "numero inexistente o no corresponde"].includes(phoneStatus) && !String(contact.phoneNote || "").trim()) {
+        errors.push("Registra una observación breve para el estado telefónico seleccionado.");
       }
       if (!email) warnings.push("El correo quedará vacío.");
       if (!phone) warnings.push("El teléfono quedará vacío.");
@@ -3439,6 +3526,8 @@
             address: record.address,
             phone: record.phone,
             email: record.email,
+            phoneStatus: record.phoneStatus || "",
+            phoneNote: record.phoneNote || "",
             turns: [],
             newLawyerRecords: []
           });
@@ -3452,6 +3541,8 @@
         profile.address ||= turn.address;
         profile.phone ||= turn.phone;
         profile.email ||= turn.email;
+        profile.phoneStatus ||= turn.phoneStatus;
+        profile.phoneNote ||= turn.phoneNote;
       });
 
       newLawyers.filter(lawyer => !isRetiredNewLawyer(lawyer)).forEach(lawyer => {
@@ -3462,6 +3553,8 @@
         profile.address ||= lawyer.address;
         profile.phone ||= lawyer.phone;
         profile.email ||= lawyer.email;
+        profile.phoneStatus ||= lawyer.phoneStatus;
+        profile.phoneNote ||= lawyer.phoneNote;
       });
 
       return [...profiles.values()].map(profile => {
@@ -3475,6 +3568,10 @@
         profile.address = profile.turns[0]?.address || latestNewLawyer?.address || profile.address;
         profile.phone = profile.turns[0]?.phone || latestNewLawyer?.phone || profile.phone;
         profile.email = profile.turns[0]?.email || latestNewLawyer?.email || profile.email;
+        profile.phoneStatus = profile.turns.find(turn => hasData(turn.phoneStatus))?.phoneStatus
+          || latestNewLawyer?.phoneStatus || profile.phoneStatus || "";
+        profile.phoneNote = profile.turns.find(turn => hasData(turn.phoneNote))?.phoneNote
+          || latestNewLawyer?.phoneNote || profile.phoneNote || "";
         profile.subjects = uniqueValues(profile.registeredTurns, "subject");
         profile.courts = uniqueValues(profile.registeredTurns, "court");
         profile.lastRecordedTurn = profile.turns[0];
@@ -3691,7 +3788,12 @@
         <div class="contact-grid">
           <div class="info-box"><span>RUT</span><strong>${displayValue(profile.rut)}</strong></div>
           <div class="info-box"><span>Dirección</span><strong>${displayValue(profile.address)}</strong></div>
-          <div class="info-box"><span>Teléfono</span><strong>${displayValue(profile.phone)}</strong></div>
+          <div class="info-box">
+            <span>Teléfono</span>
+            <strong>${displayValue(profile.phone)}</strong>
+            <div class="phone-status-line"><span class="phone-status-badge ${phoneStatusClass(profile.phoneStatus, profile.phone)}">${escapeHtml(resolvedPhoneStatus(profile.phoneStatus, profile.phone))}</span></div>
+            ${hasData(profile.phoneNote) ? `<small class="phone-note"><strong>Observación:</strong> ${escapeHtml(profile.phoneNote)}</small>` : ""}
+          </div>
           <div class="info-box"><span>Correo</span>${profile.email ? `<a href="mailto:${escapeHtml(profile.email)}">${escapeHtml(profile.email)}</a>` : "<strong>Sin información</strong>"}</div>
         </div>
         <div class="contact-edit-panel" data-contact-editor="${escapeHtml(profile.key)}">
@@ -3708,6 +3810,15 @@
             <div class="${pendingFieldClass(profile.phone)}">
               <label>Teléfono</label>
               <input type="text" data-profile-contact-field="phone" value="${hasData(profile.phone) ? escapeHtml(profile.phone) : ""}" placeholder="Teléfono actualizado">
+            </div>
+            <div>
+              <label>Estado del teléfono</label>
+              <select data-profile-contact-field="phoneStatus">${phoneStatusOptions(profile)}</select>
+            </div>
+            <div class="contact-phone-note-field">
+              <label>Observación telefónica</label>
+              <input type="text" maxlength="120" data-profile-contact-field="phoneNote" value="${hasData(profile.phoneNote) ? escapeHtml(profile.phoneNote) : ""}" placeholder="Ej. No responde después de tres intentos">
+              <p class="field-help">Máximo 120 caracteres.</p>
             </div>
             <div class="${pendingFieldClass(profile.email)}">
               <label>Correo</label>
@@ -3768,6 +3879,7 @@
         missingRut: profiles.filter(profile => !hasData(profile.rut)),
         missingEmail: profiles.filter(profile => !hasData(profile.email)),
         missingPhone: profiles.filter(profile => !hasData(profile.phone)),
+        phoneObservation: profiles.filter(profile => hasPhoneContactAlert(profile)),
         missingAddress: profiles.filter(profile => !hasData(profile.address)),
         inactive: profiles.filter(profile => !profile.active)
       };
@@ -3790,6 +3902,11 @@
           description: "Abogados con teléfono vacío o no informado.",
           empty: "No hay abogados pendientes por teléfono."
         },
+        phoneObservation: {
+          title: "Teléfonos con observación",
+          description: "Números reportados como no contesta o inexistentes.",
+          empty: "No hay observaciones telefónicas pendientes."
+        },
         missingAddress: {
           title: "Sin domicilio",
           description: "Abogados con domicilio vacío o no informado.",
@@ -3809,6 +3926,7 @@
         ["missingRut", "Sin RUT"],
         ["missingEmail", "Sin correo"],
         ["missingPhone", "Sin teléfono"],
+        ["phoneObservation", "Teléfonos observados"],
         ["missingAddress", "Sin domicilio"],
         ["inactive", "Excluidos del ranking"]
       ];
@@ -3881,7 +3999,9 @@
               <strong>${escapeHtml(profile.name)}</strong>
               <p class="muted" style="margin:4px 0 0;">${escapeHtml(lastInfo)}</p>
             </div>
-            <span class="badge gold">${profile.turns.length} turno${profile.turns.length === 1 ? "" : "s"}</span>
+            ${selectedAlertType === "phoneObservation"
+              ? `<span class="phone-status-badge ${phoneStatusClass(profile.phoneStatus, profile.phone)}">${escapeHtml(resolvedPhoneStatus(profile.phoneStatus, profile.phone))}</span>`
+              : `<span class="badge gold">${profile.turns.length} turno${profile.turns.length === 1 ? "" : "s"}</span>`}
           </div>
           <div class="alert-edit-grid">
             <div class="${pendingFieldClass(profile.rut)}">
@@ -3900,6 +4020,15 @@
             <div class="${pendingFieldClass(profile.address)} alert-address-field">
               <label>Domicilio</label>
               <input type="text" data-contact-field="address" value="${hasData(profile.address) ? escapeHtml(profile.address) : ""}" placeholder="Dirección o domicilio">
+            </div>
+            <div class="alert-phone-status-field">
+              <label>Estado del teléfono</label>
+              <select data-contact-field="phoneStatus">${phoneStatusOptions(profile)}</select>
+            </div>
+            <div class="alert-phone-note-field">
+              <label>Observación telefónica</label>
+              <input type="text" maxlength="120" data-contact-field="phoneNote" value="${hasData(profile.phoneNote) ? escapeHtml(profile.phoneNote) : ""}" placeholder="Ej. No responde después de tres intentos">
+              <p class="field-help">Máximo 120 caracteres.</p>
             </div>
             <div class="alert-save-cell">
               <button class="btn primary save-contact" type="button" data-key="${escapeHtml(profile.key)}">Guardar datos</button>
@@ -5708,9 +5837,11 @@
         name: pick("abogado"),
         id: pickExact("ID"),
         rut: formatRut(pick("rut abogado", "rut abogado(a)", "rut", "run abogado", "run")),
-        address: pick("domicilio"),
+          address: pick("domicilio"),
           phone: pick("fono", "telefono", "teléfono"),
           email: pick("email", "correo"),
+          phoneStatus: pick("estado telefono", "estado teléfono", "estado contacto telefonico", "estado contacto telefónico"),
+          phoneNote: pick("observacion telefono", "observación teléfono", "observacion contacto telefonico", "observación contacto telefónico"),
           court: canonicalCourtName(pick("tribunal", "unidad")),
           subject: canonicalSubjectName(pick("materia")),
           date,
@@ -5755,6 +5886,8 @@
           address: pick("domicilio", "direccion", "dirección"),
           phone: pick("fono", "telefono", "teléfono"),
           email: pick("email", "correo"),
+          phoneStatus: pick("estado telefono", "estado teléfono", "estado contacto telefonico", "estado contacto telefónico"),
+          phoneNote: pick("observacion telefono", "observación teléfono", "observacion contacto telefonico", "observación contacto telefónico"),
           active: pick("habilitado turno", "activo") || "Sí",
           stateBase: pick("estado base", "estado base abogado", "estado") || "Sin turno realizado",
           disableReason: pick("motivo inhabilitacion", "motivo inhabilitación", "motivo no habilitado"),
@@ -6286,6 +6419,12 @@
             phone: contact.phone,
             email: contact.email,
             address: contact.address,
+            phoneStatus: contact.phoneStatus,
+            phoneNote: contact.phoneNote,
+            phoneNoteProvided: Boolean(contact.phoneNoteProvided),
+            isNewBaseLawyer: Boolean(profile.isNewBaseLawyer),
+            newBaseRowNumber: profile.latestNewLawyerRecord?.rowNumber || 0,
+            sourceBase: profile.isNewBaseLawyer ? "Abogados nuevos" : "Base Consolidada",
             actorToken: currentSessionToken(),
             actor: currentActor()
           })
@@ -6293,6 +6432,23 @@
         script.src = `${GOOGLE_APPS_SCRIPT_URL}?${params.toString()}`;
         document.head.appendChild(script);
       });
+    }
+
+    function applyContactLocally(key, contact) {
+      const updateRecord = record => {
+        if (personKey(record) !== key) return record;
+        return {
+          ...record,
+          rut: contact.rut || record.rut,
+          email: contact.email || record.email,
+          phone: contact.phone || record.phone,
+          address: contact.address || record.address,
+          phoneStatus: contact.phoneStatus || record.phoneStatus,
+          phoneNote: contact.phoneNoteProvided ? contact.phoneNote : record.phoneNote
+        };
+      };
+      turns = turns.map(updateRecord);
+      newLawyers = newLawyers.map(updateRecord);
     }
 
     async function saveContactFromAlert(key, card) {
@@ -6303,10 +6459,13 @@
         rut: formatRut(card.querySelector('[data-contact-field="rut"]')?.value.trim() || ""),
         email: card.querySelector('[data-contact-field="email"]')?.value.trim() || "",
         phone: card.querySelector('[data-contact-field="phone"]')?.value.trim() || "",
-        address: card.querySelector('[data-contact-field="address"]')?.value.trim() || ""
+        address: card.querySelector('[data-contact-field="address"]')?.value.trim() || "",
+        phoneStatus: card.querySelector('[data-contact-field="phoneStatus"]')?.value || "",
+        phoneNote: card.querySelector('[data-contact-field="phoneNote"]')?.value.trim() || "",
+        phoneNoteProvided: true
       };
 
-      if (!contact.rut && !contact.email && !contact.phone && !contact.address) {
+      if (!contact.rut && !contact.email && !contact.phone && !contact.address && !contact.phoneStatus && !contact.phoneNote) {
         showToast("Completa al menos un dato antes de guardar.");
         return;
       }
@@ -6328,13 +6487,7 @@
         return;
       }
 
-      turns = turns.map(turn => personKey(turn) === key ? {
-        ...turn,
-        rut: contact.rut || turn.rut,
-        email: contact.email || turn.email,
-        phone: contact.phone || turn.phone,
-        address: contact.address || turn.address
-      } : turn);
+      applyContactLocally(key, contact);
       renderAll();
       showToast(`Datos actualizados en Google Sheets: ${profile.name}.`);
       syncChangeHistory({ silent: true });
@@ -6351,10 +6504,13 @@
         rut: formatRut(panel.querySelector('[data-profile-contact-field="rut"]')?.value.trim() || ""),
         address: panel.querySelector('[data-profile-contact-field="address"]')?.value.trim() || "",
         phone: panel.querySelector('[data-profile-contact-field="phone"]')?.value.trim() || "",
-        email: panel.querySelector('[data-profile-contact-field="email"]')?.value.trim() || ""
+        email: panel.querySelector('[data-profile-contact-field="email"]')?.value.trim() || "",
+        phoneStatus: panel.querySelector('[data-profile-contact-field="phoneStatus"]')?.value || "",
+        phoneNote: panel.querySelector('[data-profile-contact-field="phoneNote"]')?.value.trim() || "",
+        phoneNoteProvided: true
       };
 
-      if (!contact.rut && !contact.email && !contact.phone && !contact.address) {
+      if (!contact.rut && !contact.email && !contact.phone && !contact.address && !contact.phoneStatus && !contact.phoneNote) {
         showToast("Completa al menos un dato antes de guardar.");
         return;
       }
@@ -6377,13 +6533,7 @@
         return;
       }
 
-      turns = turns.map(turn => personKey(turn) === key ? {
-        ...turn,
-        rut: contact.rut || turn.rut,
-        address: contact.address || turn.address,
-        phone: contact.phone || turn.phone,
-        email: contact.email || turn.email
-      } : turn);
+      applyContactLocally(key, contact);
       renderAll();
       renderLawyerDetail(groupLawyers().find(item => item.key === key));
       showToast(`Datos actualizados: ${profile.name}.`);
