@@ -2661,12 +2661,12 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1ibluVbe3JQ9AnOoZzZCsjinJ7Mkrjxah2ONjdbGlcBVE_itH-PQnhE-aooQ_FF1z/exec";
-    const APP_VERSION = "1.10.3-integridad-sincronizacion";
+    const APP_VERSION = "1.10.4-edicion-nombre";
     const DISPLAY_VERSION = "Versión N°1, 24.06.2026";
     // La versión v34 impide sincronizaciones incompletas y preserva Abogados nuevos.
-    const REQUIRED_SCRIPT_VERSION = "2026-08-17-sync-integrity-v34";
+    const REQUIRED_SCRIPT_VERSION = "2026-08-17-edicion-nombre-v35";
     const ACCEPTED_SCRIPT_VERSIONS = [
-      "2026-08-17-sync-integrity-v34"
+      "2026-08-17-edicion-nombre-v35"
     ];
     const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
@@ -3225,6 +3225,7 @@
     function validateContact(contact) {
       const errors = [];
       const warnings = [];
+      const name = String(contact.name || "").trim();
       const rut = String(contact.rut || "").trim();
       const email = String(contact.email || "").trim();
       const phone = String(contact.phone || "").trim();
@@ -3232,6 +3233,9 @@
       const phoneDigits = phone.replace(/\D/g, "");
       const phoneStatus = normalize(resolvedPhoneStatus(contact.phoneStatus, phone));
 
+      if (!name) {
+        errors.push("El nombre completo del abogado(a) es obligatorio.");
+      }
       if (rut && !isValidRut(rut)) {
         errors.push("El RUT no es válido. Revisa número y dígito verificador.");
       }
@@ -3798,6 +3802,11 @@
         </div>
         <div class="contact-edit-panel" data-contact-editor="${escapeHtml(profile.key)}">
           <div class="form-grid">
+            <div>
+              <label>Nombre completo</label>
+              <input type="text" data-profile-contact-field="name" value="${escapeHtml(profile.name)}" placeholder="Nombre completo del abogado(a)">
+              <p class="field-help">Permite corregir o complementar el nombre registrado.</p>
+            </div>
             <div class="${pendingFieldClass(profile.rut)}">
               <label>RUT abogado(a)</label>
               <input type="text" data-profile-contact-field="rut" value="${hasData(profile.rut) ? escapeHtml(formatRut(profile.rut)) : ""}" placeholder="12.345.678-5">
@@ -4004,6 +4013,10 @@
               : `<span class="badge gold">${profile.turns.length} turno${profile.turns.length === 1 ? "" : "s"}</span>`}
           </div>
           <div class="alert-edit-grid">
+            <div>
+              <label>Nombre completo</label>
+              <input type="text" data-contact-field="name" value="${escapeHtml(profile.name)}" placeholder="Nombre completo del abogado(a)">
+            </div>
             <div class="${pendingFieldClass(profile.rut)}">
               <label>RUT abogado(a)</label>
               <input type="text" data-contact-field="rut" value="${hasData(profile.rut) ? escapeHtml(formatRut(profile.rut)) : ""}" placeholder="12.345.678-5">
@@ -6442,6 +6455,7 @@
           payload: JSON.stringify({
             key: profile.key,
             name: profile.name,
+            updatedName: contact.name,
             currentPhone: profile.phone,
             currentEmail: profile.email,
             rut: contact.rut,
@@ -6468,6 +6482,7 @@
         if (personKey(record) !== key) return record;
         return {
           ...record,
+          name: contact.name || record.name,
           rut: contact.rut || record.rut,
           email: contact.email || record.email,
           phone: contact.phone || record.phone,
@@ -6478,6 +6493,7 @@
       };
       turns = turns.map(updateRecord);
       newLawyers = newLawyers.map(updateRecord);
+      return contact.name ? personKey({ name: contact.name }) : key;
     }
 
     async function saveContactFromAlert(key, card) {
@@ -6485,6 +6501,7 @@
       if (!profile || !card) return;
       if (!(await canWriteSafelyAsync())) return;
       const contact = {
+        name: card.querySelector('[data-contact-field="name"]')?.value.trim() || "",
         rut: formatRut(card.querySelector('[data-contact-field="rut"]')?.value.trim() || ""),
         email: card.querySelector('[data-contact-field="email"]')?.value.trim() || "",
         phone: card.querySelector('[data-contact-field="phone"]')?.value.trim() || "",
@@ -6494,7 +6511,7 @@
         phoneNoteProvided: true
       };
 
-      if (!contact.rut && !contact.email && !contact.phone && !contact.address && !contact.phoneStatus && !contact.phoneNote) {
+      if (!contact.name && !contact.rut && !contact.email && !contact.phone && !contact.address && !contact.phoneStatus && !contact.phoneNote) {
         showToast("Completa al menos un dato antes de guardar.");
         return;
       }
@@ -6516,9 +6533,10 @@
         return;
       }
 
-      applyContactLocally(key, contact);
+      const nextKey = applyContactLocally(key, contact);
+      if (selectedLawyerKey === key) selectedLawyerKey = nextKey;
       renderAll();
-      showToast(`Datos actualizados en Google Sheets: ${profile.name}.`);
+      showToast(`Datos actualizados en Google Sheets: ${contact.name}.`);
       syncChangeHistory({ silent: true });
       syncFromSheet({ keepSelected: true }).catch(() => renderAll());
     }
@@ -6530,6 +6548,7 @@
       if (!(await canWriteSafelyAsync())) return;
 
       const contact = {
+        name: panel.querySelector('[data-profile-contact-field="name"]')?.value.trim() || "",
         rut: formatRut(panel.querySelector('[data-profile-contact-field="rut"]')?.value.trim() || ""),
         address: panel.querySelector('[data-profile-contact-field="address"]')?.value.trim() || "",
         phone: panel.querySelector('[data-profile-contact-field="phone"]')?.value.trim() || "",
@@ -6539,7 +6558,7 @@
         phoneNoteProvided: true
       };
 
-      if (!contact.rut && !contact.email && !contact.phone && !contact.address && !contact.phoneStatus && !contact.phoneNote) {
+      if (!contact.name && !contact.rut && !contact.email && !contact.phone && !contact.address && !contact.phoneStatus && !contact.phoneNote) {
         showToast("Completa al menos un dato antes de guardar.");
         return;
       }
@@ -6562,10 +6581,11 @@
         return;
       }
 
-      applyContactLocally(key, contact);
+      const nextKey = applyContactLocally(key, contact);
+      if (selectedLawyerKey === key) selectedLawyerKey = nextKey;
       renderAll();
-      renderLawyerDetail(groupLawyers().find(item => item.key === key));
-      showToast(`Datos actualizados: ${profile.name}.`);
+      renderLawyerDetail(groupLawyers().find(item => item.key === nextKey));
+      showToast(`Datos actualizados: ${contact.name}.`);
       syncChangeHistory({ silent: true });
       syncFromSheet({ keepSelected: true }).catch(() => renderAll());
     }
