@@ -2661,12 +2661,12 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1ibluVbe3JQ9AnOoZzZCsjinJ7Mkrjxah2ONjdbGlcBVE_itH-PQnhE-aooQ_FF1z/exec";
-    const APP_VERSION = "1.10.2-estado-telefono";
+    const APP_VERSION = "1.10.3-integridad-sincronizacion";
     const DISPLAY_VERSION = "Versión N°1, 24.06.2026";
-    // La versión v33 agrega el estado independiente de verificación telefónica.
-    const REQUIRED_SCRIPT_VERSION = "2026-08-17-estado-telefono-v33";
+    // La versión v34 impide sincronizaciones incompletas y preserva Abogados nuevos.
+    const REQUIRED_SCRIPT_VERSION = "2026-08-17-sync-integrity-v34";
     const ACCEPTED_SCRIPT_VERSIONS = [
-      "2026-08-17-estado-telefono-v33"
+      "2026-08-17-sync-integrity-v34"
     ];
     const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
@@ -5963,7 +5963,9 @@
           if (payload && payload.ok && Array.isArray(payload.rows) && payload.rows.length > 1) {
             resolve({
               rows: payload.rows,
-              newLawyers: Array.isArray(payload.newLawyers) ? payload.newLawyers : []
+              newLawyers: Array.isArray(payload.newLawyers) ? payload.newLawyers : [],
+              source: "apps-script",
+              includesNewLawyers: Array.isArray(payload.newLawyers)
             });
           } else {
             reject(new Error("Apps Script no devolvió filas válidas."));
@@ -5998,12 +6000,36 @@
         const csv = await response.text();
         const rows = parseCsv(csv);
         if (rows.length < 10) throw new Error("La respuesta CSV no contiene registros suficientes.");
-        return { rows, newLawyers: [] };
+        return { rows, newLawyers: [], source: "csv", includesNewLawyers: false };
       } catch (error) {
         console.warn("No se pudo leer CSV; se probará Apps Script.", error);
       }
 
-      return loadSheetViaGviz();
+      const rows = await loadSheetViaGviz();
+      return { rows, newLawyers: [], source: "gviz", includesNewLawyers: false };
+    }
+
+    function countDistinctLawyers(turnRecords, newLawyerRecords) {
+      const keys = new Set();
+      [...(turnRecords || []), ...(newLawyerRecords || [])].forEach(record => {
+        const key = personKey(record || {});
+        if (key) keys.add(key);
+      });
+      return keys.size;
+    }
+
+    function assertSyncIntegrity(loadedTurns, loadedNewLawyers, includesNewLawyers) {
+      const currentTurnCount = turns.length;
+      const currentLawyerCount = countDistinctLawyers(turns, newLawyers);
+      const nextNewLawyers = includesNewLawyers ? loadedNewLawyers : newLawyers;
+      const nextLawyerCount = countDistinctLawyers(loadedTurns, nextNewLawyers);
+
+      if (currentTurnCount >= 100 && loadedTurns.length < Math.floor(currentTurnCount * 0.85)) {
+        throw new Error(`Sincronización detenida: la planilla devolvió ${loadedTurns.length} turnos, pero la sesión tiene ${currentTurnCount}. No se reemplazaron los datos.`);
+      }
+      if (currentLawyerCount >= 100 && nextLawyerCount < Math.floor(currentLawyerCount * 0.85)) {
+        throw new Error(`Sincronización detenida: se recibieron ${nextLawyerCount} abogados, pero la sesión tiene ${currentLawyerCount}. No se reemplazaron los datos.`);
+      }
     }
 
     async function syncFromSheet(options = {}) {
@@ -6015,10 +6041,13 @@
       const loadedTurns = mapRowsToTurns(headersRaw, rows);
       if (loadedTurns.length < 10) throw new Error("La planilla no devolvió registros válidos.");
       const newLawyerRows = Array.isArray(sheetData?.newLawyers) ? sheetData.newLawyers : [];
-      turns = loadedTurns;
-      newLawyers = newLawyerRows.length > 1
+      const includesNewLawyers = Boolean(sheetData?.includesNewLawyers);
+      const loadedNewLawyers = newLawyerRows.length > 1
         ? mapNewLawyersRows(newLawyerRows[0], newLawyerRows.slice(1))
         : [];
+      assertSyncIntegrity(loadedTurns, loadedNewLawyers, includesNewLawyers);
+      turns = loadedTurns;
+      if (includesNewLawyers) newLawyers = loadedNewLawyers;
       selectedLawyerKey = keepSelectedKey;
       renderAll();
       renderLawyerDetail(keepSelectedKey ? groupLawyers().find(profile => profile.key === keepSelectedKey) : null);
