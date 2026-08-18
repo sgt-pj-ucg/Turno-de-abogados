@@ -2661,12 +2661,12 @@
   <script>
     const SHEET_CSV_URL = "https://docs.google.com/spreadsheets/d/1n6yPtG2QGJPrCD1d5oH0koqgir0W4J7WCgMgZzGaz-c/export?format=csv";
     const GOOGLE_APPS_SCRIPT_URL = "https://script.google.com/macros/s/AKfycbw1ibluVbe3JQ9AnOoZzZCsjinJ7Mkrjxah2ONjdbGlcBVE_itH-PQnhE-aooQ_FF1z/exec";
-    const APP_VERSION = "1.10.4-edicion-nombre";
+    const APP_VERSION = "1.10.6-identidad-estable";
     const DISPLAY_VERSION = "Versión N°1, 24.06.2026";
-    // La versión v34 impide sincronizaciones incompletas y preserva Abogados nuevos.
-    const REQUIRED_SCRIPT_VERSION = "2026-08-17-edicion-nombre-v35";
+    // La versión v37 confirma registros nuevos por ID estable, incluso al ingresar su primer RUT.
+    const REQUIRED_SCRIPT_VERSION = "2026-08-18-identidad-estable-v37";
     const ACCEPTED_SCRIPT_VERSIONS = [
-      "2026-08-17-edicion-nombre-v35"
+      "2026-08-18-identidad-estable-v37"
     ];
     const DISABLE_DETAIL_MAX_LENGTH = 100;
     const DISABLE_FILE_MAX_BYTES = 8 * 1024 * 1024;
@@ -2687,6 +2687,7 @@
     let changeHistory = [];
     let historyLoadError = "";
     let editingNewBaseLawyerRowNumber = null;
+    let editingNewBaseLawyerIdentity = null;
     let detectedDecreeRoster = [];
     let pdfJsLoadPromise = null;
     let selectedLawyerKey = "";
@@ -5910,6 +5911,12 @@
       }).filter(lawyer => lawyer.name && !isRetiredNewLawyer(lawyer));
     }
 
+    function hasUsableNewLawyerRows(rows) {
+      if (!Array.isArray(rows) || !rows.length || !Array.isArray(rows[0])) return false;
+      const headers = rows[0].map(normalize);
+      return headers.includes("id") && headers.some(header => header === "abogado(a)" || header === "abogado" || header.includes("abogado"));
+    }
+
     function sheetUrlForGviz() {
       return SHEET_CSV_URL
         .replace("/export?format=csv&", "/gviz/tq?tqx=out:json&")
@@ -5974,11 +5981,12 @@
         window[callbackName] = payload => {
           cleanup();
           if (payload && payload.ok && Array.isArray(payload.rows) && payload.rows.length > 1) {
+            const includesNewLawyers = hasUsableNewLawyerRows(payload.newLawyers);
             resolve({
               rows: payload.rows,
-              newLawyers: Array.isArray(payload.newLawyers) ? payload.newLawyers : [],
+              newLawyers: includesNewLawyers ? payload.newLawyers : [],
               source: "apps-script",
-              includesNewLawyers: Array.isArray(payload.newLawyers)
+              includesNewLawyers
             });
           } else {
             reject(new Error("Apps Script no devolvió filas válidas."));
@@ -6054,13 +6062,14 @@
       const loadedTurns = mapRowsToTurns(headersRaw, rows);
       if (loadedTurns.length < 10) throw new Error("La planilla no devolvió registros válidos.");
       const newLawyerRows = Array.isArray(sheetData?.newLawyers) ? sheetData.newLawyers : [];
-      const includesNewLawyers = Boolean(sheetData?.includesNewLawyers);
+      const includesNewLawyers = Boolean(sheetData?.includesNewLawyers) && hasUsableNewLawyerRows(newLawyerRows);
       const loadedNewLawyers = newLawyerRows.length > 1
         ? mapNewLawyersRows(newLawyerRows[0], newLawyerRows.slice(1))
         : [];
-      assertSyncIntegrity(loadedTurns, loadedNewLawyers, includesNewLawyers);
+      const shouldReplaceNewLawyers = includesNewLawyers && (loadedNewLawyers.length > 0 || newLawyers.length === 0);
+      assertSyncIntegrity(loadedTurns, loadedNewLawyers, shouldReplaceNewLawyers);
       turns = loadedTurns;
-      if (includesNewLawyers) newLawyers = loadedNewLawyers;
+      if (shouldReplaceNewLawyers) newLawyers = loadedNewLawyers;
       selectedLawyerKey = keepSelectedKey;
       renderAll();
       renderLawyerDetail(keepSelectedKey ? groupLawyers().find(profile => profile.key === keepSelectedKey) : null);
@@ -6362,6 +6371,11 @@
           name: payload.name,
           rut: payload.rut,
           newBaseRowNumber: payload.newBaseRowNumber,
+          newBaseRecordId: payload.newBaseRecordId,
+          originalRut: payload.originalRut,
+          originalName: payload.originalName,
+          originalEmail: payload.originalEmail,
+          originalPhone: payload.originalPhone,
           isNewBaseLawyer: payload.isNewBaseLawyer,
           sourceBase: payload.sourceBase,
           actorToken: payload.actorToken
@@ -6395,6 +6409,11 @@
         name: profile.name,
         rut: profile.latestNewLawyerRecord?.rut || profile.rut || "",
         newBaseRowNumber: profile.latestNewLawyerRecord?.rowNumber || "",
+        newBaseRecordId: profile.latestNewLawyerRecord?.id || "",
+        originalRut: profile.latestNewLawyerRecord?.rut || profile.rut || "",
+        originalName: profile.latestNewLawyerRecord?.name || profile.name || "",
+        originalEmail: profile.latestNewLawyerRecord?.email || profile.email || "",
+        originalPhone: profile.latestNewLawyerRecord?.phone || profile.phone || "",
         isNewBaseLawyer: Boolean(profile.latestNewLawyerRecord),
         sourceBase: profile.latestNewLawyerRecord ? "Abogados nuevos" : "Turnos historicos",
         phone: profile.phone,
@@ -6459,6 +6478,11 @@
             currentPhone: profile.phone,
             currentEmail: profile.email,
             rut: contact.rut,
+            newBaseRecordId: profile.latestNewLawyerRecord?.id || "",
+            originalRut: profile.latestNewLawyerRecord?.rut || profile.rut || "",
+            originalName: profile.latestNewLawyerRecord?.name || profile.name || "",
+            originalEmail: profile.latestNewLawyerRecord?.email || profile.email || "",
+            originalPhone: profile.latestNewLawyerRecord?.phone || profile.phone || "",
             phone: contact.phone,
             email: contact.email,
             address: contact.address,
@@ -6756,6 +6780,7 @@
 
     function resetNewBaseLawyerForm() {
       editingNewBaseLawyerRowNumber = null;
+      editingNewBaseLawyerIdentity = null;
       els.newBaseLawyerForm.reset();
       els.newBaseLawyerActive.value = "Sí";
       els.saveNewBaseLawyerButton.disabled = false;
@@ -6771,6 +6796,13 @@
         return;
       }
       editingNewBaseLawyerRowNumber = record.rowNumber;
+      editingNewBaseLawyerIdentity = {
+        id: record.id || "",
+        rut: record.rut || profile.rut || "",
+        name: record.name || profile.name || "",
+        email: record.email || profile.email || "",
+        phone: record.phone || profile.phone || ""
+      };
       els.newBaseLawyerRut.value = formatRut(record.rut || profile.rut || "");
       els.newBaseLawyerName.value = record.name || profile.name || "";
       els.newBaseLawyerEmail.value = record.email || profile.email || "";
@@ -6799,8 +6831,13 @@
       showToast("Retirando abogado(a) nuevo(a)...");
       const response = await retireNewBaseLawyerInGoogleSheet({
         rowNumber: record.rowNumber,
+        newBaseRecordId: record.id || "",
         rut: record.rut || profile.rut,
         name: record.name || profile.name,
+        originalRut: record.rut || profile.rut || "",
+        originalName: record.name || profile.name || "",
+        originalEmail: record.email || profile.email || "",
+        originalPhone: record.phone || profile.phone || "",
         reason: "Retirado desde la aplicación"
       });
       if (!response.ok) {
@@ -6834,6 +6871,11 @@
 
         const lawyer = {
           rowNumber: editingNewBaseLawyerRowNumber,
+          newBaseRecordId: editingNewBaseLawyerIdentity?.id || "",
+          originalRut: editingNewBaseLawyerIdentity?.rut || "",
+          originalName: editingNewBaseLawyerIdentity?.name || "",
+          originalEmail: editingNewBaseLawyerIdentity?.email || "",
+          originalPhone: editingNewBaseLawyerIdentity?.phone || "",
           rut: formatRut(els.newBaseLawyerRut.value.trim()),
           name: els.newBaseLawyerName.value.trim(),
           email: els.newBaseLawyerEmail.value.trim(),
